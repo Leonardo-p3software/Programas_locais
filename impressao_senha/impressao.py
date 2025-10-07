@@ -1,10 +1,11 @@
 import tkinter as tk                                    # Biblioteca para criar interfaces gráficas
 from tkinter import ttk, messagebox                     # Biblioteca para widgets avançados e caixas de mensagem
-import win32print, win32api                              # Biblioteca para acessar as impressoras no Windows
+import win32print, win32api                             # Biblioteca para acessar as impressoras no Windows
 import json                                             # Biblioteca para manipulação de arquivos JSON
 import qrcode                                           # Biblioteca para gerar QR Codes
 from PIL import Image, ImageTk, ImageDraw, ImageFont    # Biblioteca para manipulação de imagens
 import os                                               # Biblioteca para manipulação de arquivos e diretórios
+import tempfile                                         # Biblioteca para criar arquivos temporários   
 
 
 def listar_impressoras():
@@ -41,6 +42,13 @@ def main():
                 messagebox.showerror("Erro", "Por favor, selecione uma impressora antes de continuar.")
                 return
 
+            # Define a impressora selecionada como impressora padrão do sistema
+            try:
+                win32print.SetDefaultPrinter(impressora_selecionada)
+            except Exception as e:
+                messagebox.showerror("Erro ao definir impressora padrão", str(e))
+                return
+
             if not os.path.exists("dados.json"):
                 messagebox.showerror("Erro", "Arquivo 'dados.json' não encontrado.")
                 return
@@ -53,8 +61,7 @@ def main():
             if not senha: # Verifica se a senha está vazia
                 messagebox.showerror("Erro", "Chave 'senha' não encontrada ou está vazia no arquivo JSON.")
                 return
-
-            # Monta o link usando a senha que está no arquivo JSON
+            
             link_final = f"http://nuvem.p3software.com.br:8080/ver_posicao/{senha}"
 
             # gerando QR Code
@@ -66,41 +73,28 @@ def main():
             qr_label.config(image=qr_img)
             qr_label.image = qr_img  # Referência para não perder a imagem
 
-            '''
-            # montando a imagem para impressão
-            img_final = Image.new("RGB", (300, 400), "white")
-            draw = ImageDraw.Draw(img_final)
             try:
-                fonte_titulo = ImageFont.truetype("arial.ttf", 22)
-                fonte_sub = ImageFont.truetype("arial.ttf", 18)
-                fonte_pequena = ImageFont.truetype("arial.ttf", 14)
-            except:
-                fonte_titulo = fonte_sub = fonte_pequena = ImageFont.load_default()
+                # cria arquivo temporário para a imagem
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+                    tmp_path = tmp_file.name
+                # salvando o QR Code como PNG
+                qr.convert('RGB').save(tmp_path, 'PNG')
 
-            # Adiciona textos e QR Code na imagem
-            draw.text((90, 20), "Fila", font=fonte_titulo, fill="black")
-            draw.text((70, 50), "Direção", font=fonte_sub, fill="black")
-            draw.text((40, 80), f"Sua Senha é: {senha}", font=fonte_sub, fill="black")
-            img_final.paste(qr, (75, 120))
-            draw.text((20, 290), "Escaneie o QRCode para\nacompanhar sua posição na fila", font=fonte_pequena, fill="black")
+                '''
+                # envia o arquivo de imagem para impressão usando a impressora padrão
+                try:
+                    win32api.ShellExecute(0, "print", tmp_path, None, ".", 0)
+                    messagebox.showinfo("Impressão enviada", f"Arquivo de imagem gerado em:\n{tmp_path}\nEnviado para impressão na impressora padrão ('{impressora_selecionada}').")
+                except Exception as e_print:
+                    messagebox.showwarning("Falha ao imprimir", f"Arquivo gerado em:\n{tmp_path}\nFalha ao enviar para a impressora: {e_print}")
+                '''
 
-            # Salva imagem temporária
-            temp_path = "temp_print.bmp"
-            img_final.save(temp_path)
-
-            # Imprime usando método simplificado
-            win32print.SetDefaultPrinter(impressora_selecionada)
-            win32api.ShellExecute(0, "print", temp_path, None, ".", 0)
-
-            # Remove imagem temporária
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-
-            '''
-            # mensagem de sucesso
-            messagebox.showinfo("QR Code gerado", f"QR Code gerado para o link:\n{link_final} e sua impressão foi enviada para a impressora '{impressora_selecionada}' com a senha '{senha}'.")
+            except Exception as e_build:
+                messagebox.showerror("Erro ao preparar imagem para impressão", str(e_build))
+                return
         except Exception as e:
-            messagebox.showerror("Erro")
+            # Exibe a mensagem do erro para facilitar debug
+            messagebox.showerror("Erro", str(e))
             return
 
     btn_imprimir.config(command=imprimir)
