@@ -6,6 +6,9 @@ import qrcode                                           # Biblioteca para gerar 
 from PIL import Image, ImageTk, ImageDraw, ImageFont    # Biblioteca para manipulação de imagens
 import os                                               # Biblioteca para manipulação de arquivos e diretórios
 import tempfile                                         # Biblioteca para criar arquivos temporários   
+from reportlab.lib.pagesizes import A4                  # Biblioteca para definir tamanhos de página
+from reportlab.pdfgen import canvas                # Biblioteca para gerar PDFs
+
 
 
 def listar_impressoras():
@@ -80,17 +83,35 @@ def main():
                 # salvando o QR Code como PNG
                 qr.convert('RGB').save(tmp_path, 'PNG')
 
-                '''
-                # envia o arquivo de imagem para impressão usando a impressora padrão
                 try:
-                    win32api.ShellExecute(0, "print", tmp_path, None, ".", 0)
-                    messagebox.showinfo("Impressão enviada", f"Arquivo de imagem gerado em:\n{tmp_path}\nEnviado para impressão na impressora padrão ('{impressora_selecionada}').")
-                except Exception as e_print:
-                    messagebox.showwarning("Falha ao imprimir", f"Arquivo gerado em:\n{tmp_path}\nFalha ao enviar para a impressora: {e_print}")
-                '''
+                    base_dir = os.path.dirname(os.path.abspath(__file__)) # Diretório do script atual
+                    if not os.path.exists(base_dir):
+                        os.makedirs(base_dir)
+                    nome_arquivo = "relatorio.pdf"
+                    pdf_path = os.path.join(base_dir, nome_arquivo)
 
+                    # gera o relatório PDF
+                    c = canvas.Canvas(pdf_path, pagesize=A4)
+
+                    texto = f"Sua senha é {senha}.\nEscaneie p QR Code para acessar sua posição na fila."
+                    text_obj = c.beginText(100, 800)
+                    text_obj.setFont("Helvetica-Bold", 16)
+
+                    for linha in texto.split("\n"):
+                        text_obj.textLine(linha)
+                    c.drawText(text_obj)
+
+                    # Inserir imagem do QR Code
+                    c.drawImage(tmp_path, 100, 645, width=125, height=125)
+                    c.save()
+
+                    messagebox.showinfo("Relatório gerado", f"O relatório PDF foi criado com sucesso em:\n{pdf_path}")
+
+                except Exception as e_pdf:
+                    messagebox.showerror("Erro ao gerar PDF", str(e_pdf))
+                    return
             except Exception as e_build:
-                messagebox.showerror("Erro ao preparar imagem para impressão", str(e_build))
+                messagebox.showerror("Erro ao realizar impressão", str(e_build))
                 return
         except Exception as e:
             # Exibe a mensagem do erro para facilitar debug
