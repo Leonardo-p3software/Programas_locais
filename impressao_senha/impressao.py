@@ -85,8 +85,6 @@ def main():
 
                 try:
                     base_dir = os.path.dirname(os.path.abspath(__file__)) # Diretório do script atual
-                    if not os.path.exists(base_dir):
-                        os.makedirs(base_dir)
                     nome_arquivo = "relatorio.pdf"
                     pdf_path = os.path.join(base_dir, nome_arquivo)
 
@@ -95,7 +93,7 @@ def main():
 
                     texto = f"Sua senha é {senha}.\nEscaneie p QR Code para acessar sua posição na fila."
                     text_obj = c.beginText(100, 800)
-                    text_obj.setFont("Helvetica-Bold", 16)
+                    text_obj.setFont("Helvetica", 16)
 
                     for linha in texto.split("\n"):
                         text_obj.textLine(linha)
