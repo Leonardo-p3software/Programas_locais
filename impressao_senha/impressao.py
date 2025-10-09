@@ -8,7 +8,7 @@ import os                                               # Biblioteca para manipu
 import tempfile                                         # Biblioteca para criar arquivos temporários   
 from reportlab.lib.pagesizes import A4                  # Biblioteca para definir tamanhos de página
 from reportlab.pdfgen import canvas                # Biblioteca para gerar PDFs
-
+from reportlab.lib.units import mm
 
 
 def listar_impressoras():
@@ -80,6 +80,7 @@ def main():
                 # cria arquivo temporário para a imagem
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
                     tmp_path = tmp_file.name
+                
                 # salvando o QR Code como PNG
                 qr.convert('RGB').save(tmp_path, 'PNG')
 
@@ -89,7 +90,9 @@ def main():
                     pdf_path = os.path.join(base_dir, nome_arquivo)
 
                     # gera o relatório PDF
-                    c = canvas.Canvas(pdf_path, pagesize=A4)
+                    custom_page_size = (80 * mm, 297 * mm)
+
+                    c = canvas.Canvas(pdf_path, pagesize=custom_page_size)
 
                     texto = f"Sua senha é {senha}.\nEscaneie p QR Code para acessar sua posição na fila."
                     text_obj = c.beginText(100, 800)
@@ -102,7 +105,7 @@ def main():
                     # Inserir imagem do QR Code
                     c.drawImage(tmp_path, 100, 645, width=125, height=125)
                     c.save()
-
+                    
                     messagebox.showinfo("Relatório gerado", f"O relatório PDF foi criado com sucesso em:\n{pdf_path}")
 
                 except Exception as e_pdf:
