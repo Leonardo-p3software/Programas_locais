@@ -7,7 +7,7 @@ from PIL import Image, ImageTk, ImageDraw, ImageFont    # Biblioteca para manipu
 import os                                               # Biblioteca para manipulação de arquivos e diretórios
 import tempfile                                         # Biblioteca para criar arquivos temporários   
 from reportlab.lib.pagesizes import A4                  # Biblioteca para definir tamanhos de página
-from reportlab.pdfgen import canvas                # Biblioteca para gerar PDFs
+from reportlab.pdfgen import canvas                 # Biblioteca para gerar PDFs
 
 
 
@@ -90,17 +90,38 @@ def main():
 
                     # gera o relatório PDF
                     c = canvas.Canvas(pdf_path, pagesize=A4)
-
+                    '''
                     texto = f"Sua senha é {senha}.\nEscaneie p QR Code para acessar sua posição na fila."
                     text_obj = c.beginText(100, 800)
-                    text_obj.setFont("Helvetica", 16)
+                    text_obj.setFont("Helvetica", 8)
 
                     for linha in texto.split("\n"):
                         text_obj.textLine(linha)
                     c.drawText(text_obj)
+                    '''
+
+                    text_obj = c.beginText(100, 800)
+
+                    # Parte 1: texto normal
+                    text_obj.setFont("Helvetica", 8)
+                    text_obj.textOut("Sua senha é ")
+
+                    # Parte 2: senha personalizada
+                    text_obj.setFont("Helvetica-Bold", 10)  # Negrito e maior
+                    text_obj.textOut(senha)
+
+                    # Parte 3: continua com texto normal
+                    text_obj.setFont("Helvetica", 8)
+                    text_obj.textLine(".")  # Finaliza a linha
+
+                    # Segunda linha
+                    text_obj.textLine("Escaneie o QR Code para acessar sua posição na fila.")
+
+                    # Desenha tudo no PDF
+                    c.drawText(text_obj)
 
                     # Inserir imagem do QR Code
-                    c.drawImage(tmp_path, 100, 645, width=125, height=125)
+                    c.drawImage(tmp_path, 100, 685, width=100, height=100)
                     c.save()
 
                     messagebox.showinfo("Relatório gerado", f"O relatório PDF foi criado com sucesso em:\n{pdf_path}")
