@@ -7,7 +7,8 @@ from PIL import Image, ImageTk, ImageDraw, ImageFont    # Biblioteca para manipu
 import os                                               # Biblioteca para manipulação de arquivos e diretórios
 import tempfile                                         # Biblioteca para criar arquivos temporários   
 from reportlab.lib.pagesizes import A4                  # Biblioteca para definir tamanhos de página
-from reportlab.pdfgen import canvas                 # Biblioteca para gerar PDFs
+from reportlab.pdfgen import canvas                     # Biblioteca para gerar PDFs
+from reportlab.lib.units import mm                      # Biblioteca para unidades de medida 
 
 
 
@@ -89,7 +90,8 @@ def main():
                     pdf_path = os.path.join(base_dir, nome_arquivo)
 
                     # gera o relatório PDF
-                    c = canvas.Canvas(pdf_path, pagesize=A4)
+                    custom_page_size = (80 * mm, 297 * mm)
+                    c = canvas.Canvas(pdf_path, pagesize=custom_page_size)
                     '''
                     texto = f"Sua senha é {senha}.\nEscaneie p QR Code para acessar sua posição na fila."
                     text_obj = c.beginText(100, 800)
