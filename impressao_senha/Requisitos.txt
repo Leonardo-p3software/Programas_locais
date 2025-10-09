@@ -1,0 +1,6 @@
+Import "reportlab.lib.pagesizes" 
+Import "reportlab.pdfgen"
+Import "reportlab.pdfgen.canvas" 
+
+pip install pywin32 qrcode[pil]
+pip install pywin32
