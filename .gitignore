@@ -8366,3 +8366,4 @@ impressao_senha/venv/Scripts/__pycache__/pywin32_testall.cpython-312.pyc
 .venv/Lib/site-packages/PIL/_imagingmath.cp312-win_amd64.pyd
 .venv/Lib/site-packages/PIL/_imagingmorph.cp312-win_amd64.pyd
 .venv/Lib/site-packages/charset_normalizer/md.cp312-win_amd64.pyd
+*.pyc

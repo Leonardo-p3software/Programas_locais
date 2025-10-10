@@ -71,8 +71,8 @@ def gerar_qr_code(link_final, qr_label):
     except Exception as e:
         messagebox.showerror("Erro ao gerar QR Code", str(e))
         return None
-  
-    
+
+
 def imprimir(combo, qr_label):
     """Função principal que valida, gera QR Code e cria o PDF."""
     try:
@@ -85,34 +85,56 @@ def imprimir(combo, qr_label):
             return
 
         try:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
+            base_dir = os.path.dirname(os.path.abspath(__file__)) # apontando para o diretório do script
             nome_arquivo = "relatorio.pdf"
-            pdf_path = os.path.join(base_dir, nome_arquivo)
+            pdf_path = os.path.join(base_dir, nome_arquivo) 
 
             # Gera o relatório PDF
             custom_page_size = (80 * mm, 297 * mm)
             c = canvas.Canvas(pdf_path, pagesize=custom_page_size)
 
+
             # Texto principal
-            text_obj = c.beginText(20, 800)
-            text_obj.setFont("Helvetica", 12)
+            text_obj = c.beginText(60, 800)
+            text_obj.setFont("Helvetica", 10)
             text_obj.textOut("Sua senha é ")
-            text_obj.setFont("Helvetica-Bold", 14)
+            text_obj.setFont("Helvetica-Bold", 12)
             text_obj.textOut(senha)
-            text_obj.setFont("Helvetica", 12)
+            text_obj.setFont("Helvetica", 10)
             text_obj.textLine(".")
             c.drawText(text_obj)
 
-            # Inserir QR Code
-            c.drawImage(tmp_path, 65, 685, width=100, height=100)
+            # Inserir QR Code no pdf
+            qr_x = 65
+            qr_y = 690
+            qr_width = 100
+            qr_height = 100
+            c.drawImage(tmp_path, qr_x, qr_y, width=qr_width, height=qr_height)
 
-            # Texto secundário
-            text_obj = c.beginText(20, 200)
-            text_obj.setFont("Helvetica", 12)
-            text_obj.textLine("Escaneie o QR Code para acessar sua posição na fila.")
+            # Texto secundário e dunâmico
+            texto_abaixo_qr = [
+                "Escaneie o QR Code para acessar sua",
+                "posição na fila."
+            ]
+
+            # calculando a posição da altura do texto abaixo do QR Code
+            margem_inferior = 20  # fresta do QR Code e o texto
+            text_y = qr_y - margem_inferior
+
+            text_obj = c.beginText(25, text_y)
+            text_obj.setFont("Helvetica", 10)
+            #for para adicionar cada linha do texto
+            for linha in texto_abaixo_qr:
+                text_obj.textLine(linha)
             c.drawText(text_obj)
 
-            c.save()
+            '''
+            text_obj = c.beginText(25, 600)
+            text_obj.setFont("Helvetica", 10)
+            text_obj.textLine("Escaneie o QR Code para acessar sua")
+            text_obj.textLine("posição na fila.")
+            '''
+            c.save() 
             messagebox.showinfo("Relatório gerado", f"O relatório PDF foi criado com sucesso em:\n{pdf_path}")
 
         except Exception as e_pdf:
