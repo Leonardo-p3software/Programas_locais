@@ -16,131 +16,136 @@ def listar_impressoras():
     """Retorna uma lista de impressoras disponíveis no sistema tanto local quanto em rede."""
     return [impressora[2] for impressora in win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS)]
 
+
+def validar_dados(combo):
+    """Valida a impressora selecionada e o arquivo JSON com a senha."""
+    impressora_selecionada = combo.get()
+    if not impressora_selecionada:
+        messagebox.showerror("Erro", "Por favor, selecione uma impressora antes de continuar.")
+        return None, None
+
+    # Define a impressora selecionada como padrão
+    try:
+        win32print.SetDefaultPrinter(impressora_selecionada)
+    except Exception as e:
+        messagebox.showerror("Erro ao definir impressora padrão", str(e))
+        return None, None
+
+    # Verifica existência do arquivo JSON
+    if not os.path.exists("dados.json"):
+        messagebox.showerror("Erro", "Arquivo 'dados.json' não encontrado.")
+        return None, None
+
+    # Lê o arquivo JSON
+    with open("dados.json", "r", encoding="utf-8") as f:
+        dados = json.load(f)
+
+    senha = str(dados.get("senha", "")).strip()
+    if not senha:
+        messagebox.showerror("Erro", "Chave 'senha' não encontrada ou está vazia no arquivo JSON.")
+        return None, None
+
+    link_final = f"http://nuvem.p3software.com.br:8080/ver_posicao/{senha}"
+    return senha, link_final
+
+
+def gerar_qr_code(link_final, qr_label):
+    """Gera o QR Code, exibe na interface e salva como arquivo temporário."""
+    try:
+        # Gera QR Code e redimensiona
+        qr = qrcode.make(link_final)
+        qr = qr.resize((150, 150))
+
+        # Exibe na interface
+        qr_img = ImageTk.PhotoImage(qr)
+        qr_label.config(image=qr_img)
+        qr_label.image = qr_img  # Evita perda de referência da imagem
+
+        # Cria arquivo temporário
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+            tmp_path = tmp_file.name
+        # Salva QR Code como PNG
+        qr.convert('RGB').save(tmp_path, 'PNG')
+
+        return tmp_path
+    except Exception as e:
+        messagebox.showerror("Erro ao gerar QR Code", str(e))
+        return None
+  
+    
+def imprimir(combo, qr_label):
+    """Função principal que valida, gera QR Code e cria o PDF."""
+    try:
+        senha, link_final = validar_dados(combo)
+        if not senha or not link_final:
+            return
+
+        tmp_path = gerar_qr_code(link_final, qr_label)
+        if not tmp_path:
+            return
+
+        try:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            nome_arquivo = "relatorio.pdf"
+            pdf_path = os.path.join(base_dir, nome_arquivo)
+
+            # Gera o relatório PDF
+            custom_page_size = (80 * mm, 297 * mm)
+            c = canvas.Canvas(pdf_path, pagesize=custom_page_size)
+
+            # Texto principal
+            text_obj = c.beginText(20, 800)
+            text_obj.setFont("Helvetica", 12)
+            text_obj.textOut("Sua senha é ")
+            text_obj.setFont("Helvetica-Bold", 14)
+            text_obj.textOut(senha)
+            text_obj.setFont("Helvetica", 12)
+            text_obj.textLine(".")
+            c.drawText(text_obj)
+
+            # Inserir QR Code
+            c.drawImage(tmp_path, 65, 685, width=100, height=100)
+
+            # Texto secundário
+            text_obj = c.beginText(20, 200)
+            text_obj.setFont("Helvetica", 12)
+            text_obj.textLine("Escaneie o QR Code para acessar sua posição na fila.")
+            c.drawText(text_obj)
+
+            c.save()
+            messagebox.showinfo("Relatório gerado", f"O relatório PDF foi criado com sucesso em:\n{pdf_path}")
+
+        except Exception as e_pdf:
+            messagebox.showerror("Erro ao gerar PDF", str(e_pdf))
+            return
+
+    except Exception as e:
+        messagebox.showerror("Erro", str(e))
+        return
+
+
 def main():
     root = tk.Tk()
     root.title("Impressão de Senhas")
     root.geometry("400x350")
 
-    # Label
     label = tk.Label(root, text="Selecione a impressora:", font=("Arial", 12))
     label.pack(pady=10)
 
-    # Dropdown de impressoras
-    impressoras = listar_impressoras()  # Lista de impressoras do sistema
+    impressoras = listar_impressoras()
     combo = ttk.Combobox(root, values=impressoras, state="readonly", font=("Arial", 11))
     combo.pack(pady=5)
 
-    # Botão de imprimir
     btn_imprimir = tk.Button(root, text="Imprimir", font=("Arial", 12), width=15)
     btn_imprimir.pack(pady=20)
 
-    # Label para exibir o QR Code
     qr_label = tk.Label(root)
     qr_label.pack(pady=10)
 
-    def imprimir():
-        try:
-            #verificações iniciais
-            impressora_selecionada = combo.get()
-            if not impressora_selecionada:
-                messagebox.showerror("Erro", "Por favor, selecione uma impressora antes de continuar.")
-                return
+    btn_imprimir.config(command=lambda: imprimir(combo, qr_label))
 
-            # Define a impressora selecionada como impressora padrão do sistema
-            try:
-                win32print.SetDefaultPrinter(impressora_selecionada)
-            except Exception as e:
-                messagebox.showerror("Erro ao definir impressora padrão", str(e))
-                return
-
-            if not os.path.exists("dados.json"):
-                messagebox.showerror("Erro", "Arquivo 'dados.json' não encontrado.")
-                return
-
-            # Lê o arquivo JSON
-            with open("dados.json", "r", encoding="utf-8") as f:
-                dados = json.load(f)
-
-            senha = str(dados.get("senha", "")).strip() # Obtém a senha do JSON e remove espaços em branco
-            if not senha: # Verifica se a senha está vazia
-                messagebox.showerror("Erro", "Chave 'senha' não encontrada ou está vazia no arquivo JSON.")
-                return
-            
-            link_final = f"http://nuvem.p3software.com.br:8080/ver_posicao/{senha}"
-
-            # gerando QR Code
-            qr = qrcode.make(link_final)
-            qr = qr.resize((150, 150))
-
-            # exibindo o QR Code na interface
-            qr_img = ImageTk.PhotoImage(qr)
-            qr_label.config(image=qr_img)
-            qr_label.image = qr_img  # Referência para não perder a imagem
-
-            try:
-                # cria arquivo temporário para a imagem
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
-                    tmp_path = tmp_file.name
-                # salvando o QR Code como PNG
-                qr.convert('RGB').save(tmp_path, 'PNG')
-
-                try:
-                    base_dir = os.path.dirname(os.path.abspath(__file__)) # Diretório do script atual
-                    nome_arquivo = "relatorio.pdf"
-                    pdf_path = os.path.join(base_dir, nome_arquivo)
-
-                    # gera o relatório PDF
-                    custom_page_size = (80 * mm, 297 * mm)
-                    c = canvas.Canvas(pdf_path, pagesize=custom_page_size)
-
-                    # objeto de texto instanciado na posição (20, 800)
-                    text_obj = c.beginText(20, 800)
-
-                    # Parte 1: texto normal
-                    text_obj.setFont("Helvetica", 12)
-                    text_obj.textOut("Sua senha é ")
-                    # Parte 2: senha personalizada
-                    text_obj.setFont("Helvetica-Bold", 14)  # Negrito e maior
-                    text_obj.textOut(senha)
-                    # Parte 3: continua com texto normal
-                    text_obj.setFont("Helvetica", 12)
-                    text_obj.textLine(".")  # Finaliza a linha
-                    # Desenha tudo no PDF
-                    c.drawText(text_obj)
-
-                    # Segunda linha
-                    #text_obj.textLine("Escaneie o QR Code para acessar sua posição na fila.")
-
-                    # Inserir imagem do QR Code
-                    c.drawImage(tmp_path, 65, 685, width=100, height=100)
-
-                    text_obj = c.beginText(20, 200)
-
-                    # Parte 1: texto normal
-                    text_obj.setFont("Helvetica", 12)
-                    # Segunda linha
-                    text_obj.textLine("Escaneie o QR Code para acessar sua posição na fila.")
-
-                         # Desenha tudo no PDF
-                    c.drawText(text_obj)
-
-                    c.save()
-
-                    messagebox.showinfo("Relatório gerado", f"O relatório PDF foi criado com sucesso em:\n{pdf_path}")
-
-                except Exception as e_pdf:
-                    messagebox.showerror("Erro ao gerar PDF", str(e_pdf))
-                    return
-            except Exception as e_build:
-                messagebox.showerror("Erro ao realizar impressão", str(e_build))
-                return
-        except Exception as e:
-            # Exibe a mensagem do erro para facilitar debug
-            messagebox.showerror("Erro", str(e))
-            return
-
-    btn_imprimir.config(command=imprimir)
     root.mainloop()
+
 
 if __name__ == "__main__":
     main()
