@@ -11,6 +11,7 @@ from reportlab.pdfgen import canvas                     # Biblioteca para gerar 
 from reportlab.lib.units import mm                      # Biblioteca para unidades de medida 
 import io                                               # Biblioteca para manipulação de streams de dados
 import webbrowser                                       # Biblioteca para abrir URLs no navegador padrão
+import time                                             # Biblioteca para manipulação de tempo  
 
 def listar_impressoras():
     """Retorna uma lista de impressoras disponíveis no sistema tanto local quanto em rede."""
@@ -86,6 +87,14 @@ def visualizar_pdf(pdf_bytes):
     # Abre no visualizador padrão
     webbrowser.open(f'file://{tmp_path}')
 
+    # Espera um tempo curto antes de apagar (evita conflito com a abertura)
+    time.sleep(3)
+
+    try:
+        os.remove(tmp_path)
+    except Exception:
+        pass  # ignora erro se o arquivo ainda estiver sendo usado
+
 def imprimir(combo, qr_label):
     """Função principal que valida, gera QR Code e cria o PDF."""
     try:
@@ -156,6 +165,7 @@ def imprimir(combo, qr_label):
 
             # Salva o PDF no caminho especificado
             pdf_bytes = buffer.getvalue()
+
 
             messagebox.showinfo(
                 "Relatório gerado", 
