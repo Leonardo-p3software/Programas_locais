@@ -9,8 +9,8 @@ import tempfile                                         # Biblioteca para criar 
 from reportlab.lib.pagesizes import A4                  # Biblioteca para definir tamanhos de página
 from reportlab.pdfgen import canvas                     # Biblioteca para gerar PDFs
 from reportlab.lib.units import mm                      # Biblioteca para unidades de medida 
-
-
+import io                                               # Biblioteca para manipulação de streams de dados
+import webbrowser                                       # Biblioteca para abrir URLs no navegador padrão
 
 def listar_impressoras():
     """Retorna uma lista de impressoras disponíveis no sistema tanto local quanto em rede."""
@@ -73,6 +73,19 @@ def gerar_qr_code(link_final, qr_label):
         return None
 
 
+def visualizar_pdf(pdf_bytes):
+    """
+    Abre um PDF em memória no visualizador padrão do sistema.
+    Cria um arquivo temporário que pode ser apagado depois.
+    """
+    # Cria arquivo temporário
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        tmp_file.write(pdf_bytes)
+        tmp_path = tmp_file.name
+
+    # Abre no visualizador padrão
+    webbrowser.open(f'file://{tmp_path}')
+
 def imprimir(combo, qr_label):
     """Função principal que valida, gera QR Code e cria o PDF."""
     try:
@@ -85,13 +98,18 @@ def imprimir(combo, qr_label):
             return
 
         try:
+            '''
             base_dir = os.path.dirname(os.path.abspath(__file__)) # apontando para o diretório do script
             nome_arquivo = "relatorio.pdf"
-            pdf_path = os.path.join(base_dir, nome_arquivo) 
+            pdf_path = os.path.join(base_dir, nome_arquivo)
+            '''
+
+
 
             # Gera o relatório PDF
+            buffer = io.BytesIO()
             custom_page_size = (80 * mm, 297 * mm)
-            c = canvas.Canvas(pdf_path, pagesize=custom_page_size)
+            c = canvas.Canvas(buffer, pagesize=custom_page_size)
 
 
             # Texto principal
@@ -135,7 +153,16 @@ def imprimir(combo, qr_label):
             text_obj.textLine("posição na fila.")
             '''
             c.save() 
-            messagebox.showinfo("Relatório gerado", f"O relatório PDF foi criado com sucesso em:\n{pdf_path}")
+
+            # Salva o PDF no caminho especificado
+            pdf_bytes = buffer.getvalue()
+
+            messagebox.showinfo(
+                "Relatório gerado", 
+                "O relatório foi gerado com sucesso em memoria"
+            )
+
+            visualizar_pdf(pdf_bytes)
 
         except Exception as e_pdf:
             messagebox.showerror("Erro ao gerar PDF", str(e_pdf))
