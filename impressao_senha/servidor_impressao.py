@@ -62,9 +62,10 @@ class TelaImpressao(tk.Toplevel):
                 if valores:  # garante que existe algum valor
                     num_senha = valores[0]
                     senha = valores[1]  # no seu grid, a senha é a primeira coluna
+                    nome_fila = valores[2]
                     if senha:
-                        relatorio_ready.imprimir_senha(impressora_selecionada, senha)
-                        resultado = self.api_client.atualizar_impresso(num_senha, True)
+                        relatorio_ready.imprimir_senha(impressora_selecionada, senha, num_senha, nome_fila)
+                        resultado = self.api_client.atualizar_impresso(num_senha, False)
                                             # opcional: validar resposta da API
                         if "erro" in resultado:
                              print(f"Erro ao atualizar {num_senha}: {resultado['erro']}")
@@ -96,8 +97,9 @@ class TelaImpressao(tk.Toplevel):
             for item in dados:
                 num_senha = item.get("num_senha", "")  
                 senha = item.get("senha", "") 
+                nome_fila = item.get("nome_fila","")
            
-                self.tree.insert("", "end", values=(num_senha, senha))
+                self.tree.insert("", "end", values=(num_senha, senha, nome_fila))
 
             self.status_bar.config(text=f"{len(dados)} senhas carregadas com sucesso.")
         except Exception as e:
@@ -145,12 +147,15 @@ class TelaImpressao(tk.Toplevel):
         grid_frame = tk.Frame(self)
         grid_frame.pack(padx=10, pady=10, fill='both', expand=True)
 
-        columns = ("num_senha", "senha")
+        columns = ("num_senha", "senha", "nome_fila")
         self.tree = ttk.Treeview(grid_frame, columns=columns, show="headings")
-        self.tree.heading("num_senha", text="num_senha")
+        self.tree.heading("num_senha", text="ID Senha")
         self.tree.heading("senha", text="Senha")
+        self.tree.heading("nome_fila", text="Nome fila")
+
         self.tree.column("num_senha", width=100)
         self.tree.column("senha", width=100)
+        self.tree.column("nome_fila", width=100)
 
         scrollbar = ttk.Scrollbar(grid_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscroll=scrollbar.set)

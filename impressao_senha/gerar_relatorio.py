@@ -56,7 +56,7 @@ class GeradorRelatorioQR:
         except Exception:
             pass  # Arquivo pode estar em uso
 
-    def imprimir_senha(self, impressora, senha):
+    def imprimir_senha(self, impressora, senha, num_senha, nome_fila):
         """Função principal que valida, gera QR Code e cria o PDF."""
 
         try:
@@ -78,6 +78,7 @@ class GeradorRelatorioQR:
             texto_senha = relatorio.beginText(60, 800)
 
             texto_senha.setFont("Helvetica", 10)
+            texto_senha.textLine("Fila:" + nome_fila)
             texto_senha.textOut("Sua senha é ")
             texto_senha.setFont("Helvetica-Bold", 12)
             texto_senha.textOut(senha)
@@ -86,13 +87,13 @@ class GeradorRelatorioQR:
             relatorio.drawText(texto_senha)
 
             # QR Code
-            relatorio.drawImage(self.qr_path, 65, 690, width=100, height=100)
+            relatorio.drawImage(self.qr_path, 65, 670, width=100, height=100)
             
             # Texto abaixo do QR Code
             texto_abaixo_qr = ["Escaneie o QR Code para acessar",
             "sua posição na fila."]
             
-            text_y = 690 - 20  # margem inferior
+            text_y = 670 - 20  # margem inferior
             texto_abaixo_qrcode = relatorio.beginText(25, text_y)
             texto_abaixo_qrcode.setFont("Helvetica", 10)
             texto_abaixo_qrcode.textLines(texto_abaixo_qr)
