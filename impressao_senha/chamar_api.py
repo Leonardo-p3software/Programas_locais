@@ -26,6 +26,47 @@ class ChamarFusionAPI:
         if self.token:
             headers["Authorization"] = f"Token {self.token}"
         return headers
+    
+    def autenticar(self, username: str, password: str, token_url: str = "http://localhost:8000/api/token/") -> bool:
+        """
+        Autentica o usuário usando username e password e armazena o token recebido.
+        Args:
+            username (str): Nome de usuário
+            password (str): Senha
+            token_url (str): URL para autenticação (normalmente /api/token/)
+
+        Returns:
+            bool: True se autenticado com sucesso, False caso contrário
+        """
+        payload = {
+            "username": username,
+            "password": password
+        }
+
+        try:
+            response = requests.post(token_url, json=payload, headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            })
+
+            if response.status_code == 200:
+                self.token = response.json().get("token")
+                if self.token:
+                    return True
+                else:
+                    print("Resposta recebida, mas token não encontrado.")
+                    return False
+            elif response.status_code == 400:
+                print("Credenciais inválidas.")
+                return False
+            else:
+                print(f"Erro ao autenticar: {response.status_code} - {response.text}")
+                return False
+
+        except requests.exceptions.RequestException as e:
+            print(f"Erro de conexão durante a autenticação: {e}")
+            return False
+
 
     def listar_senhas(self):
         """

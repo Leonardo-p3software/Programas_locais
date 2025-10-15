@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 from servidor_impressao import TelaImpressao
+from chamar_api import ChamarFusionAPI
 
 
 class TelaLogin(tk.Tk):
@@ -49,14 +50,24 @@ class TelaLogin(tk.Tk):
         usuario = self.entry_usuario.get()
         senha = self.entry_senha.get()
 
-        if usuario.upper() == "LEO" and senha == "1234":
+        '''if usuario.upper() == "LEO" and senha == "1234":
             self.abrir_tela_impressao()
         else:
+            messagebox.showerror("Erro de login", "Usuário ou senha incorretos.") '''
+
+        api_client = ChamarFusionAPI()
+
+        # Tente autenticar com usuário e senha
+        if api_client.autenticar(usuario, senha):
+            print("Autenticado com sucesso!")
+            self.abrir_tela_impressao(api_client)
+        else:
+            print("Falha na autenticação.")
             messagebox.showerror("Erro de login", "Usuário ou senha incorretos.")
 
-    def abrir_tela_impressao(self):
+    def abrir_tela_impressao(self, api_client):
         self.withdraw()  # Oculta a tela de login
-        tela = TelaImpressao(self)  # Abre a tela de impressão
+        tela = TelaImpressao(api_client, self)  # Abre a tela de impressão
         # A tela de impressão é um Toplevel. Quando ela for fechada, a tela de login volta a aparecer.
         self.wait_window(tela)  # Espera a tela de impressão ser fechada
         self.deiconify()    # Mostra novamente a tela de login

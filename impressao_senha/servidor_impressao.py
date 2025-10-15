@@ -16,24 +16,49 @@ def listar_impressoras():
 
 
 class TelaImpressao(tk.Toplevel):
-    def __init__(self, master=None, token_api=None):
+    def __init__(self,  api_client, master=None ):
         super().__init__(master)
         self.title("Impressão de Senhas")
         self.geometry("800x400")
 
-        self.api_client = ChamarFusionAPI(
+        self.api_client = api_client
+        '''self.api_client = ChamarFusionAPI(
             base_url="http://localhost:8000/api/fusion",
             token=token_api or "26560e2073ff37e22c44869a4d6674cb4641301e"
-        )
+        )'''
         self.build_interface()
         self.protocol("WM_DELETE_WINDOW", self.fechar_tudo)
+
+        self.servico_ativo = False  # Por padrão, o serviço inicia parado
+
         # 👉 Carrega automaticamente as senhas ao abrir
-        self.carregar_senhas()
+        # self.carregar_senhas()
+        # 🕒 Inicia o timer que executa algo a cada 5 segundos
+        self.executar_periodicamente()
 
 
     def fechar_tudo(self):
+        self.servico_ativo = False  # Para garantir que o timer pare ao fechar
         self.destroy()
         #self.master.destroy()  # Isso encerra o `Tk` principal (TelaLogin)
+
+    def executar_periodicamente(self):
+        if self.servico_ativo:
+            # 👉 Carrega automaticamente as senhas
+            self.carregar_senhas()
+            self.on_btn_imprimir_click()
+            self.after(15000, self.executar_periodicamente)  # Agenda novamente para 5s depois
+
+    def iniciar_servico(self):
+        if not self.servico_ativo:
+            self.servico_ativo = True
+            self.lbl_status_value.config(text="Ativo", fg="green")
+            self.executar_periodicamente()
+
+    def parar_servico(self):
+        self.servico_ativo = False
+        self.lbl_status_value.config(text="Parado", fg="red")
+
     
     def on_btn_imprimir_click(self):
         impressora_selecionada = self.cb_impressora.get()
@@ -112,14 +137,14 @@ class TelaImpressao(tk.Toplevel):
         # =====================
         top_frame = tk.Frame(self)
         top_frame.pack(pady=10, padx=10, fill='x')
-
         # Botão Iniciar Serviço
-        btn_iniciar = tk.Button(top_frame, text="Iniciar Serviço")
+        btn_iniciar = tk.Button(top_frame, text="Iniciar Serviço", command=self.iniciar_servico)
         btn_iniciar.pack(side='left', padx=5)
 
         # Botão Parar Serviço
-        btn_parar = tk.Button(top_frame, text="Parar Serviço")
+        btn_parar = tk.Button(top_frame, text="Parar Serviço", command=self.parar_servico)
         btn_parar.pack(side='left', padx=5)
+
 
         # Label de Status
         lbl_status_text = tk.Label(top_frame, text="Status:")
