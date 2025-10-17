@@ -68,7 +68,7 @@ class ChamarFusionAPI:
             return False
 
 
-    def listar_senhas(self):
+    def buscar_senhas(self):
         """
         Faz requisição GET ao endpoint /listar_senhas/ e retorna a lista de senhas.
 
@@ -78,7 +78,7 @@ class ChamarFusionAPI:
         Raises:
             Exception: Em caso de erro de conexão ou resposta inesperada.
         """
-        url = f"{self.base_url}/listar_senhas/"
+        url = f"{self.base_url}/buscar_senhas/"
         try:
             response = requests.get(url, headers=self._headers(), timeout=10)
             if response.status_code == 200:

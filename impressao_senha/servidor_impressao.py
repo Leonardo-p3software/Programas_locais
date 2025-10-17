@@ -45,11 +45,23 @@ class TelaImpressao(tk.Toplevel):
     def executar_periodicamente(self):
         if self.servico_ativo:
             # 👉 Carrega automaticamente as senhas
+            self.status_bar.config(text=f"entrou em executar periodicamente.")
+            self.update_idletasks()
+            print("entrou em executar periodicamente.")
             self.carregar_senhas()
             self.on_btn_imprimir_click()
             self.after(15000, self.executar_periodicamente)  # Agenda novamente para 5s depois
+        else :
+            self.status_bar.config(text=f" NÃO entrou em executar periodicamente.")
+            print("nao entrou em executar periodicamente.")
+            self.update_idletasks()
 
     def iniciar_servico(self):
+        impressora_selecionada = self.cb_impressora.get()
+        if not impressora_selecionada:
+            messagebox.showerror("Erro", "Por favor, selecione uma impressora antes de continuar.")
+            return None
+
         if not self.servico_ativo:
             self.servico_ativo = True
             self.lbl_status_value.config(text="Ativo", fg="green")
@@ -74,31 +86,31 @@ class TelaImpressao(tk.Toplevel):
         
          # Verifica se há dados no grid
         itens = self.tree.get_children()
-        if not itens:
-            messagebox.showerror("Erro", "Não há senhas carregadas para imprimir.")
-            return None
+        if itens:
+            # messagebox.showerror("Erro", "Não há senhas carregadas para imprimir.")
+            #return None
 
-        try:
-            relatorio_ready = GeradorRelatorioQR()
+            try:
+                relatorio_ready = GeradorRelatorioQR()
 
-            # Loop pelos itens do Treeview
-            for item in itens:
-                valores = self.tree.item(item)["values"]
-                if valores:  # garante que existe algum valor
-                    num_senha = valores[0]
-                    senha = valores[1]  # no seu grid, a senha é a primeira coluna
-                    nome_fila = valores[2]
-                    if senha:
-                        relatorio_ready.imprimir_senha(impressora_selecionada, senha, num_senha, nome_fila)
-                        resultado = self.api_client.atualizar_impresso(num_senha, False)
-                                            # opcional: validar resposta da API
-                        if "erro" in resultado:
-                             print(f"Erro ao atualizar {num_senha}: {resultado['erro']}")
-                        else:
-                            print(f"Senha {num_senha} marcada como impressa.")
+                # Loop pelos itens do Treeview
+                for item in itens:
+                    valores = self.tree.item(item)["values"]
+                    if valores:  # garante que existe algum valor
+                        num_senha = valores[0]
+                        senha = valores[1]  # no seu grid, a senha é a primeira coluna
+                        nome_fila = valores[2]
+                        if senha:
+                            relatorio_ready.imprimir_senha(impressora_selecionada, senha, num_senha, nome_fila)
+                            resultado = self.api_client.atualizar_impresso(num_senha, True)
+                                                # opcional: validar resposta da API
+                            if "erro" in resultado:
+                                print(f"Erro ao atualizar {num_senha}: {resultado['erro']}")
+                            else:
+                                print(f"Senha {num_senha} marcada como impressa.")
 
-        except Exception as e:
-            messagebox.showerror("Erro ao imprimir senhas", str(e))              
+            except Exception as e:
+                messagebox.showerror("Erro ao imprimir senhas", str(e))              
         
     # ====================================================
     # Função: carregar senhas do endpoint na Treeview
@@ -109,7 +121,7 @@ class TelaImpressao(tk.Toplevel):
             self.status_bar.config(text="Carregando senhas da API...")
             self.update_idletasks()
 
-            dados = self.api_client.listar_senhas()
+            dados = self.api_client.buscar_senhas()
             if not isinstance(dados, list):
                 messagebox.showerror("Erro", "Formato inesperado de resposta da API.")
                 return
@@ -127,6 +139,8 @@ class TelaImpressao(tk.Toplevel):
                 self.tree.insert("", "end", values=(num_senha, senha, nome_fila))
 
             self.status_bar.config(text=f"{len(dados)} senhas carregadas com sucesso.")
+            # Garante que a interface foi atualizada antes de imprimir:
+            self.update_idletasks()
         except Exception as e:
             messagebox.showerror("Erro ao carregar senhas", str(e))
             self.status_bar.config(text="Erro ao carregar dados da API.")

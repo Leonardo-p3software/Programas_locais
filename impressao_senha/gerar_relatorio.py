@@ -64,7 +64,7 @@ class GeradorRelatorioQR:
             if not impressora or not senha:
                 return
 
-            link_final = f"http://nuvem.p3software.com.br:8080/ver_posicao/{senha}"
+            link_final = f"http://nuvem.p3software.com.br:8080/ver_posicao/{num_senha}"
             self.qr_path = self.gerar_qr_code(link_final)
             if not self.qr_path:
                 return
