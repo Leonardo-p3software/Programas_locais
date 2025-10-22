@@ -44,7 +44,7 @@ class TelaChamada(tk.Toplevel):
         header_frame = tk.Frame(self, bg="white")
         header_frame.pack(fill="x", pady=5)
 
-        logo = tk.Label(header_frame, text="🌀 FUSION", font=("Arial Black", 32), fg="green", bg="white")
+        logo = tk.Label(header_frame, text="SISTEMA FUSION - CHAMADA ELETRONICA", font=("Arial Black", 32), fg="green", bg="white")
         logo.pack(side="left", padx=20)
 
         # self.btn_parar = tk.Button(header_frame, text="Iniciar", width=10, command=self.Iniciar_parar)

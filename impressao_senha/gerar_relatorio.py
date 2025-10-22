@@ -12,6 +12,9 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 from PIL import ImageTk
 import qrcode
+import win32print
+import win32api
+
 
 
 class GeradorRelatorioQR:
@@ -107,8 +110,46 @@ class GeradorRelatorioQR:
 
 
 
-            self.visualizar_pdf(pdf_bytes)
+            # Enviar direto para a impressora
+            self.imprimir_pdf_direto(pdf_bytes, impressora)
+            # print('imprimiu')
+            # (Opcional) se quiser manter o preview, basta comentar ou controlar por flag:
+            # self.visualizar_pdf(pdf_bytes)
+
 
         except Exception as e:
             messagebox.showerror("Erro ao gerar relatório", str(e))
+
+
+    def imprimir_pdf_direto(self, pdf_bytes, impressora=None):
+        """Envia o PDF diretamente para a impressora."""
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+                tmp_pdf.write(pdf_bytes)
+                tmp_pdf_path = tmp_pdf.name
+
+            if not impressora:
+                # Pega a impressora padrão do Windows
+                impressora = win32print.GetDefaultPrinter()
+
+            # Envia o PDF para impressão
+            win32api.ShellExecute(
+                0,
+                "print",
+                tmp_pdf_path,
+                f'"{impressora}"',
+                ".",
+                0
+            )
+
+            # Aguarda alguns segundos antes de tentar remover (opcional)
+            time.sleep(5)
+            try:
+                os.remove(tmp_pdf_path)
+            except Exception:
+                pass  # o arquivo pode estar em uso durante a impressão
+
+        except Exception as e:
+            messagebox.showerror("Erro na impressão", str(e))
+
 

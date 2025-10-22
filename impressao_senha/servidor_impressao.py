@@ -169,8 +169,8 @@ class TelaImpressao(tk.Toplevel):
         self.lbl_status_value.pack(side='left', padx=5)
 
         # Botão Imprimir
-        btn_imprimir = tk.Button(top_frame, text="Imprimir", command=self.on_btn_imprimir_click)
-        btn_imprimir.pack(side='right', padx=5)
+        # btn_imprimir = tk.Button(top_frame, text="Imprimir", command=self.on_btn_imprimir_click)
+        # btn_imprimir.pack(side='right', padx=5)
 
         # Combobox de impressoras
         impressoras = listar_impressoras()
