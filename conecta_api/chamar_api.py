@@ -197,3 +197,33 @@ class ChamarFusionAPI:
 
         except requests.exceptions.RequestException as err:
             return {'erro': f'Request Error: {err}'}
+        
+
+    def apagar_nao_realizados(self) -> dict:
+        """
+        Apaga todas as chamadas não realizadas (realizado=False) 
+        da unidade associada ao usuário autenticado.
+
+        :return: dicionário com o status da operação ou mensagem de erro
+        """
+        url = f"{self.base_url}/apagar_nao_realizados/"
+
+        try:
+            response = requests.delete(url, headers=self._headers(), timeout=10)
+            response.raise_for_status()  # Lança exceção para status HTTP 4xx/5xx
+            return response.json()
+
+        except requests.exceptions.HTTPError as errh:
+            try:
+                erro_json = response.json()
+            except Exception:
+                erro_json = response.text
+            return {
+                'erro': f'HTTP Error: {errh}',
+                'detalhes': erro_json,
+                'status_code': response.status_code
+            }
+
+        except requests.exceptions.RequestException as err:
+            return {'erro': f'Request Error: {err}'}
+

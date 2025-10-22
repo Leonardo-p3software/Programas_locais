@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
-from servidor_impressao import TelaImpressao
-from conecta_apis.chamar_api import ChamarFusionAPI
+from .servidor_impressao import TelaImpressao
+from conecta_api.chamar_api import ChamarFusionAPI
 
 
 class TelaLogin(tk.Tk):
@@ -72,7 +72,11 @@ class TelaLogin(tk.Tk):
         self.wait_window(tela)  # Espera a tela de impressão ser fechada
         self.deiconify()    # Mostra novamente a tela de login
 
+    def main():
+        app = TelaLogin()
+        app.mainloop()
 
-if __name__ == "__main__":
-    app = TelaLogin()
-    app.mainloop()
+    if __name__ == "__main__":
+        main()
+
+

@@ -1,8 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import win32print
-from conecta_apis.chamar_api import ChamarFusionAPI
-from gerar_relatorio import GeradorRelatorioQR
+from conecta_api.chamar_api import ChamarFusionAPI
+from .gerar_relatorio import GeradorRelatorioQR
 
 
 def listar_impressoras():

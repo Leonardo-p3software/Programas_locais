@@ -47,8 +47,15 @@ class TelaChamada(tk.Toplevel):
         logo = tk.Label(header_frame, text="🌀 FUSION", font=("Arial Black", 32), fg="green", bg="white")
         logo.pack(side="left", padx=20)
 
+        # self.btn_parar = tk.Button(header_frame, text="Iniciar", width=10, command=self.Iniciar_parar)
+        # self.btn_parar.pack(side="right", padx=20)
+
         self.btn_parar = tk.Button(header_frame, text="Iniciar", width=10, command=self.Iniciar_parar)
-        self.btn_parar.pack(side="right", padx=20)
+        self.btn_parar.pack(side="right", padx=(5, 5))
+
+        self.btn_limpar_fila = tk.Button(header_frame, text="Limpar Fila", width=12, command=self.limpar_fila)
+        self.btn_limpar_fila.pack(side="right", padx=(5, 20))
+
 
 
         # Abas
@@ -381,6 +388,26 @@ class TelaChamada(tk.Toplevel):
             print(f"[OK] Chamada {chamada_id} atualizada com sucesso: {resultado}")
             # Se quiser exibir no Tkinter:
             # messagebox.showinfo("Sucesso", f"Chamada {chamada_id} atualizada com sucesso")
+
+
+    def limpar_fila(self):
+        """Apaga todas as chamadas não realizadas da unidade do usuário logado."""
+        if not self.api_client:
+            messagebox.showerror("Erro", "API Client não configurado.")
+            return
+
+        resultado = self.api_client.apagar_nao_realizados()
+        
+        if 'erro' in resultado:
+            print(f"[ERRO] {resultado['erro']}")
+            if 'detalhes' in resultado:
+                print(f"Detalhes: {resultado['detalhes']}")
+            messagebox.showerror("Erro", f"Falha ao limpar fila:\n{resultado['erro']}")
+        else:
+            print(f"[OK] {resultado.get('status', 'Fila limpa com sucesso.')}")
+            messagebox.showinfo("Sucesso", "Fila de chamadas não realizadas limpa com sucesso.")
+
+
 
     ###################
     # Função que usa fala do windows.
