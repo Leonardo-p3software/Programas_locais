@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 from servidor_impressao import TelaImpressao
-from chamar_api import ChamarFusionAPI
+from conecta_apis.chamar_api import ChamarFusionAPI
 
 
 class TelaLogin(tk.Tk):

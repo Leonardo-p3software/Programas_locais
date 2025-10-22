@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import win32print
-from chamar_api import ChamarFusionAPI
+from conecta_apis.chamar_api import ChamarFusionAPI
 from gerar_relatorio import GeradorRelatorioQR
 
 
