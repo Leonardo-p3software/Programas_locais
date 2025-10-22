@@ -12,6 +12,10 @@ class TelaChamada(tk.Toplevel):
         super().__init__(master)
         self.title("Chamada Eletrônica")
         self.api_client = api_client
+        # Controle de atualização automática
+        self.executando = False   # status inicial = parado
+        self.after_id = None      # guardará o ID do after() para cancelamento
+
 
         # Abre a janela maximizada sem loop infinito
         self.bind("<Map>", self.maximize_once)
@@ -23,7 +27,12 @@ class TelaChamada(tk.Toplevel):
         self.frame_lock = threading.Lock()
         self.current_frame = None
 
+        self.video_ativado = False
+        self.video_timer_id = None  # guardará o after que aguarda 20 segundos
+
         self.create_widgets()
+       
+       
 
     def maximize_once(self, event=None):
         """Maximiza apenas uma vez, sem loop."""
@@ -38,8 +47,9 @@ class TelaChamada(tk.Toplevel):
         logo = tk.Label(header_frame, text="🌀 FUSION", font=("Arial Black", 32), fg="green", bg="white")
         logo.pack(side="left", padx=20)
 
-        btn_parar = tk.Button(header_frame, text="Parado", width=10)
-        btn_parar.pack(side="right", padx=20)
+        self.btn_parar = tk.Button(header_frame, text="Iniciar", width=10, command=self.Iniciar_parar)
+        self.btn_parar.pack(side="right", padx=20)
+
 
         # Abas
         #notebook = ttk.Notebook(self)
@@ -48,14 +58,24 @@ class TelaChamada(tk.Toplevel):
         # === BARRA DE STATUS ===
         status_frame = tk.Frame(self, bg="#f0f0f0", height=25)
         status_frame.pack(side="bottom", fill="x")
+        
         status_frame.pack_propagate(False)  # garante que a altura seja respeitada
 
+        #self.status_label = tk.Label(status_frame, text="Pronto", anchor="w", bg="#f0f0f0")
+        #self.status_label.pack(fill="both", padx=10)
+        # Parte esquerda: mensagens
         self.status_label = tk.Label(status_frame, text="Pronto", anchor="w", bg="#f0f0f0")
-        self.status_label.pack(fill="both", padx=10)
+        self.status_label.pack(side="left", fill="x", expand=True, padx=10)
+
+        # Parte direita: status de execução
+        self.status_execucao = tk.Label(status_frame, text="⏹ Parado", anchor="e", bg="#f0f0f0", fg="red")
+        self.status_execucao.pack(side="right", padx=10)
 
         # Notebook
         notebook = ttk.Notebook(self)
         notebook.pack(side="top", expand=True, fill="both")  # adicionado side="top"
+        
+        self.notebook = notebook  # salva referência para poder alternar abas
 
         # === ABA CHAMADA ===
         frame_chamada = tk.Frame(notebook, bg="white")
@@ -100,16 +120,16 @@ class TelaChamada(tk.Toplevel):
         btn_frame = tk.Frame(frame_video, bg="black")
         btn_frame.pack(pady=10)
 
-        self.btn_video = tk.Button(btn_frame, text="▶ Reproduzir Vídeo", command=self.play_video)
-        self.btn_video.pack(side="left", padx=5)
-
-        self.btn_stop = tk.Button(btn_frame, text="⏹ Parar", command=self.stop_video)
-        self.btn_stop.pack(side="left", padx=5)
+        # self.btn_video = tk.Button(btn_frame, text="▶ Reproduzir Vídeo", command=self.play_video)
+        # self.btn_video.pack(side="left", padx=5)
+        # self.btn_stop = tk.Button(btn_frame, text="⏹ Parar", command=self.stop_video)
+        # self.btn_stop.pack(side="left", padx=5)
+        self.agendar_video_automatico()
 
 
 
         # Inicia atualização automática das chamadas
-        self.after(1000, self.atualizar_periodicamente)
+        #self.after(2000, self.atualizar_periodicamente)
 
 
     # -------------------------
@@ -177,6 +197,52 @@ class TelaChamada(tk.Toplevel):
         # Atualiza a imagem a cada 15 ms (~60 fps possíveis)
         self.after(15, self.update_gui_frame)
 
+
+
+    # -------------------------
+    # MODO VÍDEO AUTOMÁTICO
+    # -------------------------
+    def agendar_video_automatico(self):
+        """Agenda a troca automática para o vídeo em 20 segundos se não houver chamadas."""
+        # Cancela qualquer agendamento anterior
+        if self.video_timer_id:
+            self.after_cancel(self.video_timer_id)
+
+        # Agenda execução para daqui a 20 segundos
+        self.video_timer_id = self.after(20000, self.tocar_video_automaticamente)
+
+    def tocar_video_automaticamente(self):
+        """Muda para a aba de vídeo e inicia a reprodução."""
+        if not hasattr(self, "notebook") or self.notebook is None:
+            print("Notebook ainda não está disponível — adiando vídeo automático.")
+            # tenta novamente em 2 segundos
+            self.video_timer_id = self.after(2000, self.tocar_video_automaticamente)
+            return
+
+        if self.video_ativado:
+            return
+
+        self.video_ativado = True
+        self.notebook.select(1)
+        self.play_video()
+        self._atualizar_status("Nenhuma chamada — vídeo iniciado automaticamente.")
+
+
+    def voltar_para_chamada(self):
+        """Retorna para a aba de chamada quando houver dados."""
+        # Cancela agendamento do vídeo se existir
+        if self.video_timer_id:
+            self.after_cancel(self.video_timer_id)
+            self.video_timer_id = None
+
+        # Se o vídeo estiver rodando, para
+        if self.video_ativado:
+            self.stop_video()
+            self.video_ativado = False
+            self.notebook.select(0)  # volta para aba chamada
+            self._atualizar_status("Chamadas encontradas — voltando para tela de chamadas.")
+    
+
     # -------------------------
     # ATUALIZAÇÃO DE CHAMADAS
     # -------------------------
@@ -190,14 +256,30 @@ class TelaChamada(tk.Toplevel):
                 if self.api_client:
                     dados = self.api_client.buscar_chamadas()
 
-                if not dados:
+                '''if not dados:
                     self._atualizar_status("Nenhum dado retornado da API.")
                     return
 
                 textos = [item.get("texto", "") for item in dados if item.get("texto")]
                 if not textos:
                     self._atualizar_status("Nenhum texto válido recebido.")
+                    return '''
+                
+                if not dados:
+                    self._atualizar_status("Nenhum dado retornado da API.")
+                    # Agenda vídeo automático em 20 segundos
+                    self.after(0, self.agendar_video_automatico)
                     return
+
+                textos = [item.get("texto", "") for item in dados if item.get("texto")]
+                if not textos:
+                    self._atualizar_status("Nenhum texto válido recebido.")
+                    self.after(0, self.agendar_video_automatico)
+                    return
+
+                # Se chegou aqui, há dados — cancela vídeo e volta para aba chamada
+                self.after(0, self.voltar_para_chamada)
+
 
                 # Atualiza GUI no thread principal
 
@@ -218,8 +300,8 @@ class TelaChamada(tk.Toplevel):
     def _atualizar_widgets_chamada(self, dados):
         """Atualiza label_chamando e adiciona chamadas ao histórico rapidamente, sem after."""
         
-        MAX_LINHAS = 100
-        REMOVER_LINHAS = 5
+        MAX_LINHAS = 30
+        REMOVER_LINHAS = 15
 
         for item in dados:
             texto = item.get("texto", "")
@@ -267,9 +349,14 @@ class TelaChamada(tk.Toplevel):
 
 
     def atualizar_periodicamente(self):
-        """Executa atualização automática a cada 10 segundos."""
+        """Executa atualização automática apenas quando em modo 'executando'."""
+        if not self.executando:
+            return  # sai se estiver parado
+
         self.atualizar_chamadas()
-        self.after(10000, self.atualizar_periodicamente)
+        # agenda próxima execução
+        self.after_id = self.after(20000, self.atualizar_periodicamente)
+
 
     def executar_atualizar_realizado(self, chamada_id: int, origem: str):
         """
@@ -307,7 +394,7 @@ class TelaChamada(tk.Toplevel):
         :param velocidade: Velocidade da fala (padrão 150)
         """
         engine = pyttsx3.init()
-        print(texto)
+        
         # Configura velocidade
         engine.setProperty('rate', velocidade)
         
@@ -320,5 +407,32 @@ class TelaChamada(tk.Toplevel):
                     break
 
         engine.say(texto)
-        print(texto)
+        
         engine.runAndWait()
+
+    ###################
+    # Função do Botão Iniciar/Parar
+    ################
+    def Iniciar_parar(self):
+        """Alterna entre iniciar e parar a atualização automática."""
+        if self.executando:
+            # Parar execução
+            self.executando = False
+            self.btn_parar.config(text="Iniciar")
+            self.status_execucao.config(text="⏹ Parado", fg="red")
+
+            # Cancela o after pendente se houver
+            if self.after_id:
+                self.after_cancel(self.after_id)
+                self.after_id = None
+
+            self._atualizar_status("Atualização automática parada.")
+        else:
+            # Iniciar execução
+            self.executando = True
+            self.btn_parar.config(text="Parar")
+            self.status_execucao.config(text="▶ Executando", fg="green")
+
+            self._atualizar_status("Atualização automática iniciada.")
+            # Chama a função imediatamente e agenda próximas
+            self.atualizar_periodicamente()
