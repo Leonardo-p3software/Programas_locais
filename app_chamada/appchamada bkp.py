@@ -5,7 +5,7 @@ import cv2
 import threading
 import time
 from datetime import datetime
-import pyttsx3 #biblitoteca para voz do windows
+
 
 class TelaChamada(tk.Toplevel):
     def __init__(self, api_client=None, master=None):
@@ -62,7 +62,7 @@ class TelaChamada(tk.Toplevel):
         notebook.add(frame_chamada, text="Chamada")
 
         tk.Label(frame_chamada, text="Chamando", font=("Arial", 18, "bold"), bg="white").pack(pady=(10, 0))
-        self.label_chamando = tk.Label(frame_chamada, text=" ", font=("Arial", 24), bg="white")
+        self.label_chamando = tk.Label(frame_chamada, text="<nome> paciente", font=("Arial", 24), bg="white")
         self.label_chamando.pack(pady=20)
 
         tk.Label(frame_chamada, text="Últimas chamadas", font=("Arial", 16, "bold"), bg="white").pack()
@@ -84,7 +84,7 @@ class TelaChamada(tk.Toplevel):
             wrap="word",
             yscrollcommand=scrollbar.set
         )
-        self.text_ultimas.insert("end", "")
+        self.text_ultimas.insert("end", "<nome> paciente\n<nome> paciente\n<nome> paciente")
         self.text_ultimas.config(state="disabled")
         self.text_ultimas.pack(side="left", fill="both", expand=True)
 
@@ -216,48 +216,39 @@ class TelaChamada(tk.Toplevel):
         threading.Thread(target=tarefa, daemon=True).start()
 
     def _atualizar_widgets_chamada(self, dados):
-        """Atualiza label_chamando e adiciona chamadas ao histórico rapidamente, sem after."""
+        """
+        Atualiza label_chamando e adiciona novas chamadas ao histórico,
+        executando atualizar_realizado para cada registro.
         
-        MAX_LINHAS = 100
-        REMOVER_LINHAS = 5
+        :param dados: lista de dicionários retornada da API
+        """
+        def processar_item(index):
+            if index >= len(dados):
+                return  # terminou
 
-        for item in dados:
+            item = dados[index]
             texto = item.get("texto", "")
             chamada_id = item.get("id")
             origem = item.get("origem", "fila_senhas")
 
-            # Atualiza label principal (fica no último item)
+            # Atualiza label principal
             self.label_chamando.config(text=texto)
-            # Atualiza GUI após processar todos
-            self.label_chamando.update_idletasks()
-            # Fala o nome do paciente 2 vezes
-            
-            for _ in range(2):  # 2 vezes
-                self.falar_texto(texto)
 
-
-            
             # Executa atualizar_realizado
             self.executar_atualizar_realizado(chamada_id, origem)
 
             # Atualiza histórico no Text (mais recentes no topo)
             self.text_ultimas.config(state="normal")
             self.text_ultimas.insert("1.0", f"{texto}\n")
-            # Atualiza GUI após processar todos
-            self.text_ultimas.update_idletasks()
-
-            total_linhas = int(self.text_ultimas.index('end-1c').split('.')[0])
-            if total_linhas > MAX_LINHAS:
-                idx_inicio = f"{total_linhas - REMOVER_LINHAS + 1}.0"
-                idx_fim = f"{total_linhas}.end"
-                self.text_ultimas.delete(idx_inicio, idx_fim)
-
             self.text_ultimas.yview_moveto(0)
             self.text_ultimas.config(state="disabled")
+            self.text_ultimas.update_idletasks()
 
-        # Atualiza GUI após processar todos
-        self.text_ultimas.update_idletasks()
+            # Processa próximo item com pequena pausa para permitir atualização visual
+            self.after(200, lambda: processar_item(index + 1))
 
+        # Inicia processamento do primeiro item
+        processar_item(0)
 
 
     def _atualizar_status(self, mensagem):
@@ -295,30 +286,3 @@ class TelaChamada(tk.Toplevel):
             # Se quiser exibir no Tkinter:
             # messagebox.showinfo("Sucesso", f"Chamada {chamada_id} atualizada com sucesso")
 
-    ###################
-    # Função que usa fala do windows.
-    ################
-    def falar_texto(self, texto: str, voz: str = None, velocidade: int = 150):
-        """
-        Lê o texto em voz humana usando o TTS do Windows.
-
-        :param texto: Texto a ser falado
-        :param voz: Nome da voz disponível no sistema (opcional)
-        :param velocidade: Velocidade da fala (padrão 150)
-        """
-        engine = pyttsx3.init()
-        print(texto)
-        # Configura velocidade
-        engine.setProperty('rate', velocidade)
-        
-        # Configura voz (se fornecida)
-        if voz:
-            vozes = engine.getProperty('voices')
-            for v in vozes:
-                if voz.lower() in v.name.lower():
-                    engine.setProperty('voice', v.id)
-                    break
-
-        engine.say(texto)
-        print(texto)
-        engine.runAndWait()
