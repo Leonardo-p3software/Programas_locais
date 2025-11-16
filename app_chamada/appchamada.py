@@ -1,11 +1,17 @@
+# ==== CONFIGURAÇÃO FIXA DO COMTYPES/PYTTSX3 (ETAPAS 3 E 4) ====
+import os
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "threads;1"
+os.environ["FFMPEG_THREADS"] = "1"
+
+import win32com.client  # ✅ usamos diretamente a API de fala do Windows
+
 import tkinter as tk
 from tkinter import ttk, messagebox
-from PIL import Image, ImageTk
-import cv2
 import threading
-import time
 from datetime import datetime
-import pyttsx3 #biblitoteca para voz do windows
+import vlc
+import sys
+
 
 class TelaChamada(tk.Toplevel):
     def __init__(self, api_client=None, master=None):
@@ -140,71 +146,71 @@ class TelaChamada(tk.Toplevel):
 
 
     # -------------------------
-    # CONTROLE DE VÍDEO
-    # -------------------------
+    # CONTROLE DE VÍDEO (usando VLC)
+        # -------------------------
     def play_video(self):
-        video_path = "app_chamada/video.mp4"
-        self.cap = cv2.VideoCapture(video_path)
+        """Inicia a reprodução do vídeo via VLC embutido no Tkinter."""
+        if self.video_running:
+            return  # já está rodando
 
-        if not self.cap.isOpened():
-            messagebox.showerror("Erro", f"Não foi possível abrir o vídeo: {video_path}")
+
+        if getattr(sys, 'frozen', False):
+            # Caminho real do executável
+            app_dir = os.path.dirname(os.path.abspath(sys.executable))
+        else:
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+
+        video_path = os.path.join(app_dir, "video.mp4")
+
+        if not os.path.exists(video_path):
+            messagebox.showerror("Erro", f"Vídeo não encontrado: {video_path}")
             return
+        
+        # Inicializa VLC apenas uma vez
+        if not hasattr(self, "vlc_instance"):
+            self.vlc_instance = vlc.Instance()
 
-        fps = self.cap.get(cv2.CAP_PROP_FPS)
-        self.frame_interval = 1.0 / fps if fps > 0 else 1 / 30
+        # Cria player
+        self.vlc_player = self.vlc_instance.media_player_new()
+        media = self.vlc_instance.media_new(video_path)
+        self.vlc_player.set_media(media)
+        self.vlc_player.video_set_scale(0)  # ajusta automaticamente
 
+
+        # Associa o player à janela Tkinter (usa o handle do widget)
+        self.update_idletasks()
+        self.video_label.update_idletasks()
+        handle = self.video_label.winfo_id()
+
+        try:
+            self.vlc_player.set_hwnd(handle)  # Windows
+
+        except AttributeError:
+            # Linux/macOS
+            self.vlc_player.set_xwindow(handle)
+
+        # Reproduz
+        self.vlc_player.play()
+        self.vlc_player.set_fullscreen(True)   # 🔥 fullscreen
         self.video_running = True
-        self.video_thread = threading.Thread(target=self.video_loop, daemon=True)
-        self.video_thread.start()
-        self.update_gui_frame()
+
 
     def stop_video(self):
-        self.video_running = False
-        if self.cap:
-            self.cap.release()
-            self.cap = None
-        self.video_label.config(image="", bg="black")
-
-    def video_loop(self):
-        """Thread que lê os frames do vídeo na velocidade correta."""
-        while self.video_running and self.cap.isOpened():
-            start = time.time()
-            ret, frame = self.cap.read()
-            if not ret:
-                # Reinicia o vídeo automaticamente
-                self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                continue
-
-            with self.frame_lock:
-                self.current_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            # Espera o tempo exato do FPS real
-            elapsed = time.time() - start
-            time.sleep(max(0, self.frame_interval - elapsed))
-
-    def update_gui_frame(self):
-        """Atualiza o frame na interface (Tkinter) sem travar."""
+        """Para o vídeo e limpa a tela."""
         if not self.video_running:
             return
 
-        with self.frame_lock:
-            frame = self.current_frame
+        try:
+            if hasattr(self, "vlc_player") and self.vlc_player:
+                self.vlc_player.stop()
+                self.vlc_player.release()
+        except Exception:
+            pass
 
-        if frame is not None:
-            # Redimensionar frame para caber na área do label
-            label_width = max(1, self.video_label.winfo_width())
-            label_height = max(1, self.video_label.winfo_height())
-            resized = cv2.resize(frame, (label_width, label_height), interpolation=cv2.INTER_AREA)
+        self.video_running = False
+        self.video_label.config(bg="black", image="")
 
-            img = Image.fromarray(resized)
-            imgtk = ImageTk.PhotoImage(image=img)
-            self.video_label.imgtk = imgtk
-            self.video_label.config(image=imgtk)
-
-        # Atualiza a imagem a cada 15 ms (~60 fps possíveis)
-        self.after(15, self.update_gui_frame)
-
-
+    
 
     # -------------------------
     # MODO VÍDEO AUTOMÁTICO
@@ -219,6 +225,7 @@ class TelaChamada(tk.Toplevel):
         self.video_timer_id = self.after(20000, self.tocar_video_automaticamente)
 
     def tocar_video_automaticamente(self):
+
         """Muda para a aba de vídeo e inicia a reprodução."""
         if not hasattr(self, "notebook") or self.notebook is None:
             print("Notebook ainda não está disponível — adiando vídeo automático.")
@@ -228,7 +235,10 @@ class TelaChamada(tk.Toplevel):
 
         if self.video_ativado:
             return
-
+        
+        if self.video_running:
+            return
+        
         self.video_ativado = True
         self.notebook.select(1)
         self.play_video()
@@ -318,14 +328,16 @@ class TelaChamada(tk.Toplevel):
             # Atualiza label principal (fica no último item)
             self.label_chamando.config(text=texto)
             # Atualiza GUI após processar todos
-            self.label_chamando.update_idletasks()
+            #self.label_chamando.update_idletasks()
+            self.label_chamando.update()
             # Fala o nome do paciente 2 vezes
             
             for _ in range(2):  # 2 vezes
                 self.falar_texto(texto)
-
-
             
+
+
+           
             # Executa atualizar_realizado
             self.executar_atualizar_realizado(chamada_id, origem)
 
@@ -333,7 +345,8 @@ class TelaChamada(tk.Toplevel):
             self.text_ultimas.config(state="normal")
             self.text_ultimas.insert("1.0", f"{texto}\n")
             # Atualiza GUI após processar todos
-            self.text_ultimas.update_idletasks()
+            #self.text_ultimas.update_idletasks()
+            self.text_ultimas.update()
 
             total_linhas = int(self.text_ultimas.index('end-1c').split('.')[0])
             if total_linhas > MAX_LINHAS:
@@ -345,8 +358,8 @@ class TelaChamada(tk.Toplevel):
             self.text_ultimas.config(state="disabled")
 
         # Atualiza GUI após processar todos
-        self.text_ultimas.update_idletasks()
-
+        #self.text_ultimas.update_idletasks()
+        self.text_ultimas.update()
 
 
     def _atualizar_status(self, mensagem):
@@ -409,34 +422,35 @@ class TelaChamada(tk.Toplevel):
 
 
 
+     ###################
+    # Função que usa fala do Windows (SAPI)
     ###################
-    # Função que usa fala do windows.
-    ################
-    def falar_texto(self, texto: str, voz: str = None, velocidade: int = 150):
+    def falar_texto(self, texto: str, voz: str = None, velocidade: int = 1):
         """
-        Lê o texto em voz humana usando o TTS do Windows.
+        Lê o texto em voz humana usando a API nativa de fala do Windows (SAPI.SpVoice).
 
         :param texto: Texto a ser falado
-        :param voz: Nome da voz disponível no sistema (opcional)
-        :param velocidade: Velocidade da fala (padrão 150)
+        :param voz: Nome da voz (opcional)
+        :param velocidade: Fator de velocidade (1 = normal)
         """
-        engine = pyttsx3.init()
-        
-        # Configura velocidade
-        engine.setProperty('rate', velocidade)
-        
-        # Configura voz (se fornecida)
-        if voz:
-            vozes = engine.getProperty('voices')
-            for v in vozes:
-                if voz.lower() in v.name.lower():
-                    engine.setProperty('voice', v.id)
-                    break
+        try:
+            speaker = win32com.client.Dispatch("SAPI.SpVoice")
 
-        engine.say(texto)
-        
-        engine.runAndWait()
+            # velocidade
+            speaker.Rate = max(-10, min(10, int(velocidade)))
 
+            # seleção de voz
+            if voz:
+                for v in speaker.GetVoices():
+                    if voz.lower() in v.GetDescription().lower():
+                        speaker.Voice = v
+                        break
+
+            speaker.Speak(texto)
+
+        except Exception as e:
+            print(f"[ERRO] Falha ao falar texto: {e}")
+        
     ###################
     # Função do Botão Iniciar/Parar
     ################

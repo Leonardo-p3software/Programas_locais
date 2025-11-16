@@ -5,8 +5,15 @@ class ChamarFusionAPI:
     Classe cliente para acessar o endpoint SenhasPorUsuarioView.
     Retorna a lista de senhas vinculadas às filas e empresas do usuário autenticado.
     """
+    # DEV
+    # FUSION_API_URL="http://localhost:8000/api/fusion" # producao: "http://nuvem.p3software.com.br:8080/api/fusion"
+    # FUSION_TOKEN_URL= "http://localhost:8000/api/token/" # Proodução: "http://nuvem.p3software.com.br:8080/api/token/"
+    
+    #Producao
+    FUSION_API_URL="http://nuvem.p3software.com.br:8080/api/fusion/"
+    FUSION_TOKEN_URL= "http://nuvem.p3software.com.br:8080/api/token/"
 
-    def __init__(self, base_url: str = "http://localhost:8000/api/fusion", token: str = None):
+    def __init__(self, base_url: str = FUSION_API_URL , token: str = None):
         """
         Inicializa a classe com a URL base e o token de autenticação (se necessário).
 
@@ -27,7 +34,7 @@ class ChamarFusionAPI:
             headers["Authorization"] = f"Token {self.token}"
         return headers
     
-    def autenticar(self, username: str, password: str, token_url: str = "http://localhost:8000/api/token/") -> bool:
+    def autenticar(self, username: str, password: str, token_url: str = FUSION_TOKEN_URL) -> bool:
         """
         Autentica o usuário usando username e password e armazena o token recebido.
         Args:

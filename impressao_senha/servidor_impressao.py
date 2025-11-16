@@ -50,7 +50,7 @@ class TelaImpressao(tk.Toplevel):
             print("entrou em executar periodicamente.")
             self.carregar_senhas()
             self.on_btn_imprimir_click()
-            self.after(15000, self.executar_periodicamente)  # Agenda novamente para 5s depois
+            self.after(10000, self.executar_periodicamente)  # Agenda novamente para 10s depois
         else :
             self.status_bar.config(text=f" NÃO entrou em executar periodicamente.")
             print("nao entrou em executar periodicamente.")
