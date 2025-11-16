@@ -1,14 +1,19 @@
 import tkinter as tk
 from tkinter import messagebox
-from servidor_impressao import TelaImpressao
-from conecta_apis.chamar_api import ChamarFusionAPI
+from .servidor_impressao import TelaImpressao
+from conecta_api.chamar_api import ChamarFusionAPI
 
+
+import sys, os
 
 class TelaLogin(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Login")
-        self.geometry("300x150")
+        self.title("Impressão de senhas")
+        # Barra de status
+        self.status_bar = tk.Label(self, text="Sistema Fusion - P3 Software", bd=1,relief="sunken",anchor="w")
+        self.status_bar.pack(side="bottom", fill="x")
+        self.geometry("300x180")
         self.resizable(False, False)
         self.centralizar_tela()
         self.criar_widgets()
@@ -16,7 +21,7 @@ class TelaLogin(tk.Tk):
     def centralizar_tela(self):
         self.update_idletasks()
         largura = 300
-        altura = 150
+        altura = 180
         x = (self.winfo_screenwidth() // 2) - (largura // 2)
         y = (self.winfo_screenheight() // 2) - (altura // 2)
         self.geometry(f"{largura}x{altura}+{x}+{y}")
@@ -72,7 +77,11 @@ class TelaLogin(tk.Tk):
         self.wait_window(tela)  # Espera a tela de impressão ser fechada
         self.deiconify()    # Mostra novamente a tela de login
 
-
-if __name__ == "__main__":
+def main():
     app = TelaLogin()
     app.mainloop()
+
+if __name__ == "__main__":
+    main()
+
+

@@ -7,8 +7,11 @@ from .appchamada import TelaChamada
 class TelaLogin(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Login")
-        self.geometry("300x150")
+        self.title("Chamada de Senhas")
+        # Barra de status
+        self.status_bar = tk.Label(self, text="Sistema Fusion - P3 Software", bd=1,relief="sunken",anchor="w")
+        self.status_bar.pack(side="bottom", fill="x")
+        self.geometry("300x180")
         self.resizable(False, False)
         self.centralizar_tela()
         self.criar_widgets()
@@ -16,7 +19,7 @@ class TelaLogin(tk.Tk):
     def centralizar_tela(self):
         self.update_idletasks()
         largura = 300
-        altura = 150
+        altura = 180
         x = (self.winfo_screenwidth() // 2) - (largura // 2)
         y = (self.winfo_screenheight() // 2) - (altura // 2)
         self.geometry(f"{largura}x{altura}+{x}+{y}")
@@ -61,11 +64,22 @@ class TelaLogin(tk.Tk):
             messagebox.showerror("Erro de login", "Usuário ou senha incorretos.")
 
     def abrir_tela_chamada(self, api_client):
+        # 🔥 1 — Cursor de espera
+        self.config(cursor="wait")
+        self.update()  # atualiza imediatamente
+        
         self.withdraw()  # Oculta a tela de login
-        tela = TelaChamada(api_client, self)  # Abre a tela de impressão
+        try:
+            
+            tela = TelaChamada(api_client, self)  # Abre a tela de impressão
+
+        finally:
+            # 🔥 3 — Restaurar cursor ao padrão
+            self.config(cursor="")
+            self.update()     
+            
         self.wait_window(tela)  # Espera a tela de impressão ser fechada
         self.deiconify()    # Mostra novamente a tela de login
-
 
 # ✅ Função principal que será chamada no launcher
 def main():

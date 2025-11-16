@@ -1,17 +1,27 @@
+# ==== CONFIGURAÇÃO FIXA DO COMTYPES/PYTTSX3 (ETAPAS 3 E 4) ====
+import os
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "threads;1"
+os.environ["FFMPEG_THREADS"] = "1"
+
+import win32com.client  # ✅ usamos diretamente a API de fala do Windows
+
 import tkinter as tk
 from tkinter import ttk, messagebox
-from PIL import Image, ImageTk
-import cv2
 import threading
-import time
 from datetime import datetime
-import pyttsx3 #biblitoteca para voz do windows
+import vlc
+import sys
+
 
 class TelaChamada(tk.Toplevel):
     def __init__(self, api_client=None, master=None):
         super().__init__(master)
         self.title("Chamada Eletrônica")
         self.api_client = api_client
+        # Controle de atualização automática
+        self.executando = False   # status inicial = parado
+        self.after_id = None      # guardará o ID do after() para cancelamento
+
 
         # Abre a janela maximizada sem loop infinito
         self.bind("<Map>", self.maximize_once)
@@ -23,7 +33,12 @@ class TelaChamada(tk.Toplevel):
         self.frame_lock = threading.Lock()
         self.current_frame = None
 
+        self.video_ativado = False
+        self.video_timer_id = None  # guardará o after que aguarda 20 segundos
+
         self.create_widgets()
+       
+       
 
     def maximize_once(self, event=None):
         """Maximiza apenas uma vez, sem loop."""
@@ -35,11 +50,19 @@ class TelaChamada(tk.Toplevel):
         header_frame = tk.Frame(self, bg="white")
         header_frame.pack(fill="x", pady=5)
 
-        logo = tk.Label(header_frame, text="🌀 FUSION", font=("Arial Black", 32), fg="green", bg="white")
+        logo = tk.Label(header_frame, text="SISTEMA FUSION - CHAMADA ELETRONICA", font=("Arial Black", 32), fg="green", bg="white")
         logo.pack(side="left", padx=20)
 
-        btn_parar = tk.Button(header_frame, text="Parado", width=10)
-        btn_parar.pack(side="right", padx=20)
+        # self.btn_parar = tk.Button(header_frame, text="Iniciar", width=10, command=self.Iniciar_parar)
+        # self.btn_parar.pack(side="right", padx=20)
+
+        self.btn_parar = tk.Button(header_frame, text="Iniciar", width=10, command=self.Iniciar_parar)
+        self.btn_parar.pack(side="right", padx=(5, 5))
+
+        self.btn_limpar_fila = tk.Button(header_frame, text="Limpar Fila", width=12, command=self.limpar_fila)
+        self.btn_limpar_fila.pack(side="right", padx=(5, 20))
+
+
 
         # Abas
         #notebook = ttk.Notebook(self)
@@ -48,14 +71,24 @@ class TelaChamada(tk.Toplevel):
         # === BARRA DE STATUS ===
         status_frame = tk.Frame(self, bg="#f0f0f0", height=25)
         status_frame.pack(side="bottom", fill="x")
+        
         status_frame.pack_propagate(False)  # garante que a altura seja respeitada
 
+        #self.status_label = tk.Label(status_frame, text="Pronto", anchor="w", bg="#f0f0f0")
+        #self.status_label.pack(fill="both", padx=10)
+        # Parte esquerda: mensagens
         self.status_label = tk.Label(status_frame, text="Pronto", anchor="w", bg="#f0f0f0")
-        self.status_label.pack(fill="both", padx=10)
+        self.status_label.pack(side="left", fill="x", expand=True, padx=10)
+
+        # Parte direita: status de execução
+        self.status_execucao = tk.Label(status_frame, text="⏹ Parado", anchor="e", bg="#f0f0f0", fg="red")
+        self.status_execucao.pack(side="right", padx=10)
 
         # Notebook
         notebook = ttk.Notebook(self)
         notebook.pack(side="top", expand=True, fill="both")  # adicionado side="top"
+        
+        self.notebook = notebook  # salva referência para poder alternar abas
 
         # === ABA CHAMADA ===
         frame_chamada = tk.Frame(notebook, bg="white")
@@ -100,82 +133,132 @@ class TelaChamada(tk.Toplevel):
         btn_frame = tk.Frame(frame_video, bg="black")
         btn_frame.pack(pady=10)
 
-        self.btn_video = tk.Button(btn_frame, text="▶ Reproduzir Vídeo", command=self.play_video)
-        self.btn_video.pack(side="left", padx=5)
-
-        self.btn_stop = tk.Button(btn_frame, text="⏹ Parar", command=self.stop_video)
-        self.btn_stop.pack(side="left", padx=5)
+        # self.btn_video = tk.Button(btn_frame, text="▶ Reproduzir Vídeo", command=self.play_video)
+        # self.btn_video.pack(side="left", padx=5)
+        # self.btn_stop = tk.Button(btn_frame, text="⏹ Parar", command=self.stop_video)
+        # self.btn_stop.pack(side="left", padx=5)
+        self.agendar_video_automatico()
 
 
 
         # Inicia atualização automática das chamadas
-        self.after(1000, self.atualizar_periodicamente)
+        #self.after(2000, self.atualizar_periodicamente)
 
 
     # -------------------------
-    # CONTROLE DE VÍDEO
-    # -------------------------
+    # CONTROLE DE VÍDEO (usando VLC)
+        # -------------------------
     def play_video(self):
-        video_path = "app_chamada/video.mp4"
-        self.cap = cv2.VideoCapture(video_path)
+        """Inicia a reprodução do vídeo via VLC embutido no Tkinter."""
+        if self.video_running:
+            return  # já está rodando
 
-        if not self.cap.isOpened():
-            messagebox.showerror("Erro", f"Não foi possível abrir o vídeo: {video_path}")
+
+        if getattr(sys, 'frozen', False):
+            # Caminho real do executável
+            app_dir = os.path.dirname(os.path.abspath(sys.executable))
+        else:
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+
+        video_path = os.path.join(app_dir, "video.mp4")
+
+        if not os.path.exists(video_path):
+            messagebox.showerror("Erro", f"Vídeo não encontrado: {video_path}")
             return
+        
+        # Inicializa VLC apenas uma vez
+        if not hasattr(self, "vlc_instance"):
+            self.vlc_instance = vlc.Instance()
 
-        fps = self.cap.get(cv2.CAP_PROP_FPS)
-        self.frame_interval = 1.0 / fps if fps > 0 else 1 / 30
+        # Cria player
+        self.vlc_player = self.vlc_instance.media_player_new()
+        media = self.vlc_instance.media_new(video_path)
+        self.vlc_player.set_media(media)
+        self.vlc_player.video_set_scale(0)  # ajusta automaticamente
 
+
+        # Associa o player à janela Tkinter (usa o handle do widget)
+        self.update_idletasks()
+        self.video_label.update_idletasks()
+        handle = self.video_label.winfo_id()
+
+        try:
+            self.vlc_player.set_hwnd(handle)  # Windows
+
+        except AttributeError:
+            # Linux/macOS
+            self.vlc_player.set_xwindow(handle)
+
+        # Reproduz
+        self.vlc_player.play()
+        self.vlc_player.set_fullscreen(True)   # 🔥 fullscreen
         self.video_running = True
-        self.video_thread = threading.Thread(target=self.video_loop, daemon=True)
-        self.video_thread.start()
-        self.update_gui_frame()
+
 
     def stop_video(self):
-        self.video_running = False
-        if self.cap:
-            self.cap.release()
-            self.cap = None
-        self.video_label.config(image="", bg="black")
-
-    def video_loop(self):
-        """Thread que lê os frames do vídeo na velocidade correta."""
-        while self.video_running and self.cap.isOpened():
-            start = time.time()
-            ret, frame = self.cap.read()
-            if not ret:
-                # Reinicia o vídeo automaticamente
-                self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                continue
-
-            with self.frame_lock:
-                self.current_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            # Espera o tempo exato do FPS real
-            elapsed = time.time() - start
-            time.sleep(max(0, self.frame_interval - elapsed))
-
-    def update_gui_frame(self):
-        """Atualiza o frame na interface (Tkinter) sem travar."""
+        """Para o vídeo e limpa a tela."""
         if not self.video_running:
             return
 
-        with self.frame_lock:
-            frame = self.current_frame
+        try:
+            if hasattr(self, "vlc_player") and self.vlc_player:
+                self.vlc_player.stop()
+                self.vlc_player.release()
+        except Exception:
+            pass
 
-        if frame is not None:
-            # Redimensionar frame para caber na área do label
-            label_width = max(1, self.video_label.winfo_width())
-            label_height = max(1, self.video_label.winfo_height())
-            resized = cv2.resize(frame, (label_width, label_height), interpolation=cv2.INTER_AREA)
+        self.video_running = False
+        self.video_label.config(bg="black", image="")
 
-            img = Image.fromarray(resized)
-            imgtk = ImageTk.PhotoImage(image=img)
-            self.video_label.imgtk = imgtk
-            self.video_label.config(image=imgtk)
+    
 
-        # Atualiza a imagem a cada 15 ms (~60 fps possíveis)
-        self.after(15, self.update_gui_frame)
+    # -------------------------
+    # MODO VÍDEO AUTOMÁTICO
+    # -------------------------
+    def agendar_video_automatico(self):
+        """Agenda a troca automática para o vídeo em 20 segundos se não houver chamadas."""
+        # Cancela qualquer agendamento anterior
+        if self.video_timer_id:
+            self.after_cancel(self.video_timer_id)
+
+        # Agenda execução para daqui a 20 segundos
+        self.video_timer_id = self.after(20000, self.tocar_video_automaticamente)
+
+    def tocar_video_automaticamente(self):
+
+        """Muda para a aba de vídeo e inicia a reprodução."""
+        if not hasattr(self, "notebook") or self.notebook is None:
+            print("Notebook ainda não está disponível — adiando vídeo automático.")
+            # tenta novamente em 2 segundos
+            self.video_timer_id = self.after(2000, self.tocar_video_automaticamente)
+            return
+
+        if self.video_ativado:
+            return
+        
+        if self.video_running:
+            return
+        
+        self.video_ativado = True
+        self.notebook.select(1)
+        self.play_video()
+        self._atualizar_status("Nenhuma chamada — vídeo iniciado automaticamente.")
+
+
+    def voltar_para_chamada(self):
+        """Retorna para a aba de chamada quando houver dados."""
+        # Cancela agendamento do vídeo se existir
+        if self.video_timer_id:
+            self.after_cancel(self.video_timer_id)
+            self.video_timer_id = None
+
+        # Se o vídeo estiver rodando, para
+        if self.video_ativado:
+            self.stop_video()
+            self.video_ativado = False
+            self.notebook.select(0)  # volta para aba chamada
+            self._atualizar_status("Chamadas encontradas — voltando para tela de chamadas.")
+    
 
     # -------------------------
     # ATUALIZAÇÃO DE CHAMADAS
@@ -190,14 +273,30 @@ class TelaChamada(tk.Toplevel):
                 if self.api_client:
                     dados = self.api_client.buscar_chamadas()
 
-                if not dados:
+                '''if not dados:
                     self._atualizar_status("Nenhum dado retornado da API.")
                     return
 
                 textos = [item.get("texto", "") for item in dados if item.get("texto")]
                 if not textos:
                     self._atualizar_status("Nenhum texto válido recebido.")
+                    return '''
+                
+                if not dados:
+                    self._atualizar_status("Nenhum dado retornado da API.")
+                    # Agenda vídeo automático em 20 segundos
+                    self.after(0, self.agendar_video_automatico)
                     return
+
+                textos = [item.get("texto", "") for item in dados if item.get("texto")]
+                if not textos:
+                    self._atualizar_status("Nenhum texto válido recebido.")
+                    self.after(0, self.agendar_video_automatico)
+                    return
+
+                # Se chegou aqui, há dados — cancela vídeo e volta para aba chamada
+                self.after(0, self.voltar_para_chamada)
+
 
                 # Atualiza GUI no thread principal
 
@@ -218,8 +317,8 @@ class TelaChamada(tk.Toplevel):
     def _atualizar_widgets_chamada(self, dados):
         """Atualiza label_chamando e adiciona chamadas ao histórico rapidamente, sem after."""
         
-        MAX_LINHAS = 100
-        REMOVER_LINHAS = 5
+        MAX_LINHAS = 30
+        REMOVER_LINHAS = 15
 
         for item in dados:
             texto = item.get("texto", "")
@@ -229,14 +328,16 @@ class TelaChamada(tk.Toplevel):
             # Atualiza label principal (fica no último item)
             self.label_chamando.config(text=texto)
             # Atualiza GUI após processar todos
-            self.label_chamando.update_idletasks()
+            #self.label_chamando.update_idletasks()
+            self.label_chamando.update()
             # Fala o nome do paciente 2 vezes
             
             for _ in range(2):  # 2 vezes
                 self.falar_texto(texto)
-
-
             
+
+
+           
             # Executa atualizar_realizado
             self.executar_atualizar_realizado(chamada_id, origem)
 
@@ -244,7 +345,8 @@ class TelaChamada(tk.Toplevel):
             self.text_ultimas.config(state="normal")
             self.text_ultimas.insert("1.0", f"{texto}\n")
             # Atualiza GUI após processar todos
-            self.text_ultimas.update_idletasks()
+            #self.text_ultimas.update_idletasks()
+            self.text_ultimas.update()
 
             total_linhas = int(self.text_ultimas.index('end-1c').split('.')[0])
             if total_linhas > MAX_LINHAS:
@@ -256,8 +358,8 @@ class TelaChamada(tk.Toplevel):
             self.text_ultimas.config(state="disabled")
 
         # Atualiza GUI após processar todos
-        self.text_ultimas.update_idletasks()
-
+        #self.text_ultimas.update_idletasks()
+        self.text_ultimas.update()
 
 
     def _atualizar_status(self, mensagem):
@@ -267,9 +369,14 @@ class TelaChamada(tk.Toplevel):
 
 
     def atualizar_periodicamente(self):
-        """Executa atualização automática a cada 10 segundos."""
+        """Executa atualização automática apenas quando em modo 'executando'."""
+        if not self.executando:
+            return  # sai se estiver parado
+
         self.atualizar_chamadas()
-        self.after(10000, self.atualizar_periodicamente)
+        # agenda próxima execução
+        self.after_id = self.after(20000, self.atualizar_periodicamente)
+
 
     def executar_atualizar_realizado(self, chamada_id: int, origem: str):
         """
@@ -295,30 +402,78 @@ class TelaChamada(tk.Toplevel):
             # Se quiser exibir no Tkinter:
             # messagebox.showinfo("Sucesso", f"Chamada {chamada_id} atualizada com sucesso")
 
+
+    def limpar_fila(self):
+        """Apaga todas as chamadas não realizadas da unidade do usuário logado."""
+        if not self.api_client:
+            messagebox.showerror("Erro", "API Client não configurado.")
+            return
+
+        resultado = self.api_client.apagar_nao_realizados()
+        
+        if 'erro' in resultado:
+            print(f"[ERRO] {resultado['erro']}")
+            if 'detalhes' in resultado:
+                print(f"Detalhes: {resultado['detalhes']}")
+            messagebox.showerror("Erro", f"Falha ao limpar fila:\n{resultado['erro']}")
+        else:
+            print(f"[OK] {resultado.get('status', 'Fila limpa com sucesso.')}")
+            messagebox.showinfo("Sucesso", "Fila de chamadas não realizadas limpa com sucesso.")
+
+
+
+     ###################
+    # Função que usa fala do Windows (SAPI)
     ###################
-    # Função que usa fala do windows.
-    ################
-    def falar_texto(self, texto: str, voz: str = None, velocidade: int = 150):
+    def falar_texto(self, texto: str, voz: str = None, velocidade: int = 1):
         """
-        Lê o texto em voz humana usando o TTS do Windows.
+        Lê o texto em voz humana usando a API nativa de fala do Windows (SAPI.SpVoice).
 
         :param texto: Texto a ser falado
-        :param voz: Nome da voz disponível no sistema (opcional)
-        :param velocidade: Velocidade da fala (padrão 150)
+        :param voz: Nome da voz (opcional)
+        :param velocidade: Fator de velocidade (1 = normal)
         """
-        engine = pyttsx3.init()
-        print(texto)
-        # Configura velocidade
-        engine.setProperty('rate', velocidade)
-        
-        # Configura voz (se fornecida)
-        if voz:
-            vozes = engine.getProperty('voices')
-            for v in vozes:
-                if voz.lower() in v.name.lower():
-                    engine.setProperty('voice', v.id)
-                    break
+        try:
+            speaker = win32com.client.Dispatch("SAPI.SpVoice")
 
-        engine.say(texto)
-        print(texto)
-        engine.runAndWait()
+            # velocidade
+            speaker.Rate = max(-10, min(10, int(velocidade)))
+
+            # seleção de voz
+            if voz:
+                for v in speaker.GetVoices():
+                    if voz.lower() in v.GetDescription().lower():
+                        speaker.Voice = v
+                        break
+
+            speaker.Speak(texto)
+
+        except Exception as e:
+            print(f"[ERRO] Falha ao falar texto: {e}")
+        
+    ###################
+    # Função do Botão Iniciar/Parar
+    ################
+    def Iniciar_parar(self):
+        """Alterna entre iniciar e parar a atualização automática."""
+        if self.executando:
+            # Parar execução
+            self.executando = False
+            self.btn_parar.config(text="Iniciar")
+            self.status_execucao.config(text="⏹ Parado", fg="red")
+
+            # Cancela o after pendente se houver
+            if self.after_id:
+                self.after_cancel(self.after_id)
+                self.after_id = None
+
+            self._atualizar_status("Atualização automática parada.")
+        else:
+            # Iniciar execução
+            self.executando = True
+            self.btn_parar.config(text="Parar")
+            self.status_execucao.config(text="▶ Executando", fg="green")
+
+            self._atualizar_status("Atualização automática iniciada.")
+            # Chama a função imediatamente e agenda próximas
+            self.atualizar_periodicamente()

@@ -1,0 +1,25 @@
+Gerador de executavel
+
+Orientações: (Pré-requisitos)
+1 - Antes de gerar o executável, precisa rodar o código abaixo para exportar a API SAPI.dll que é a API da fala.
+    Esse processo é necessário, pq senão fizer o executavel vai acionar a DLL dinamicamente e vai dar erro. Esse código gera uma LIB que é adicionada no executavel.
+        import comtypes.client
+        comtypes.client.GetModule('C:\\Windows\\System32\\Speech\\Common\\sapi.dll')
+        print("Typelib gerada com sucesso!")
+    Se funcionar: significa que o módulo COM do SAPI (voz do Windows) foi gerado com sucesso e salvo no diretório correto do comtypes.
+
+2 - Na máquina cliente tem que instalar o Microsoft Visual C++ Redistributable Package.
+    Necessário para rodar o o executavel em C++
+
+3 - Instalar o VLC que é o codec de video utilizado no programa. 
+
+
+
+nuitka --standalone --onefile --enable-plugin=tk-inter --include-package=app_chamada --include-package=conecta_api --include-package=pyttsx3 --windows-icon-from-ico=fusion.ico --output-dir=dist --remove-output start_app_chamada.py
+
+nuitka --standalone --onefile --enable-plugin=tk-inter --include-package=app_chamada --include-package=conecta_api --include-package=pyttsx3 --include-package=comtypes --include-package=comtypes.gen --include-data-dir="C:\Users\Leo\AppData\Local\Programs\Python\Python312\Lib\site-packages\comtypes\gen=comtypes/gen" --windows-icon-from-ico=fusion.ico --output-dir=dist --remove-output start_app_chamada.py
+
+# nova teste 01
+
+nuitka --standalone --onefile --enable-plugin=tk-inter --include-package=app_chamada --include-package=conecta_api --windows-icon-from-ico=fusion.ico --output-dir=dist --remove-output start_app_chamada.py
+

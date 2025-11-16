@@ -1,8 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import win32print
-from conecta_apis.chamar_api import ChamarFusionAPI
-from gerar_relatorio import GeradorRelatorioQR
+from conecta_api.chamar_api import ChamarFusionAPI
+from .gerar_relatorio import GeradorRelatorioQR
 
 
 def listar_impressoras():
@@ -50,7 +50,7 @@ class TelaImpressao(tk.Toplevel):
             print("entrou em executar periodicamente.")
             self.carregar_senhas()
             self.on_btn_imprimir_click()
-            self.after(15000, self.executar_periodicamente)  # Agenda novamente para 5s depois
+            self.after(10000, self.executar_periodicamente)  # Agenda novamente para 10s depois
         else :
             self.status_bar.config(text=f" NÃO entrou em executar periodicamente.")
             print("nao entrou em executar periodicamente.")
@@ -169,8 +169,8 @@ class TelaImpressao(tk.Toplevel):
         self.lbl_status_value.pack(side='left', padx=5)
 
         # Botão Imprimir
-        btn_imprimir = tk.Button(top_frame, text="Imprimir", command=self.on_btn_imprimir_click)
-        btn_imprimir.pack(side='right', padx=5)
+        # btn_imprimir = tk.Button(top_frame, text="Imprimir", command=self.on_btn_imprimir_click)
+        # btn_imprimir.pack(side='right', padx=5)
 
         # Combobox de impressoras
         impressoras = listar_impressoras()

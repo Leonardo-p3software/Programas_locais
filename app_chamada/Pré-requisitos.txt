@@ -1,0 +1,4 @@
+Instalar o VLC no computador
+
+depois instalar a biblioteca do python
+pip install python-vlc

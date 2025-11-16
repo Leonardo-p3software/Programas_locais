@@ -1,114 +1,86 @@
-
-#================================
-# Gerar Relatório
-#================================
-import os
-import io
-import time
-import webbrowser
-import tempfile
-from tkinter import messagebox
-from reportlab.lib.units import mm
-from reportlab.pdfgen import canvas
-from PIL import ImageTk
 import qrcode
+from PIL import Image, ImageDraw, ImageFont, ImageWin
+import win32print
+import tempfile, os
+import win32ui
 
 
 class GeradorRelatorioQR:
-    def __init__(self):
-        self.senha = None
-        self.link_final = None
-        self.qr_path = None
-
-    def gerar_qr_code(self, link_final):
-        """Gera o QR Code, exibe na interface e salva como arquivo temporário."""
-        try:
-            qr = qrcode.make(link_final)
-            qr = qr.resize((150, 150))
-            
-            #qr_img = ImageTk.PhotoImage(qr)
-            #qr_label.config(image=qr_img)
-            #qr_label.image = qr_img  # Evita garbage collection
-
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
-                qr_path = tmp_file.name
-
-            
-            qr.convert('RGB').save(qr_path, 'PNG')
-
-            return qr_path
-        except Exception as e:
-            messagebox.showerror("Erro ao gerar QR Code", str(e))
-            return False
-        
-
-    def visualizar_pdf(self, pdf_bytes):
-        """Abre o PDF em memória no visualizador padrão do sistema."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-            tmp_file.write(pdf_bytes)
-            tmp_path = tmp_file.name
-
-        webbrowser.open(f'file://{tmp_path}')
-        time.sleep(3)
-
-        try:
-            os.remove(tmp_path)
-        except Exception:
-            pass  # Arquivo pode estar em uso
-
     def imprimir_senha(self, impressora, senha, num_senha, nome_fila):
-        """Função principal que valida, gera QR Code e cria o PDF."""
 
+        # === QR CODE ===
+        link = f"http://nuvem.p3software.com.br:8080/ver_posicao/{num_senha}"
+        qr = qrcode.make(link).resize((240, 240))
+
+        # === CRIA IMAGEM ===
+        largura = 580   # 80mm em 203dpi
+        altura = 600
+        imagem = Image.new("RGB", (largura, altura), "white")
+        draw = ImageDraw.Draw(imagem)
+
+        # fonte segura
         try:
-           
-            if not impressora or not senha:
-                return
+            fonte_titulo = ImageFont.truetype("arial.ttf", 32)
+            fonte_texto = ImageFont.truetype("arial.ttf", 32)
+        except:
+            fonte_titulo = ImageFont.load_default()
+            fonte_texto = ImageFont.load_default()
 
-            link_final = f"http://nuvem.p3software.com.br:8080/ver_posicao/{num_senha}"
-            self.qr_path = self.gerar_qr_code(link_final)
-            if not self.qr_path:
-                return
+        draw.text((20, 00), f"=========================", fill="black", font=fonte_texto)
+        draw.text((20, 30), f"Fila: {nome_fila}", fill="black", font=fonte_texto)
+        draw.text((20, 80), f"Sua senha: {senha}", fill="black", font=fonte_titulo)
 
+        imagem.paste(qr, (165, 150))
 
-            buffer = io.BytesIO()
-            custom_page_size = (80 * mm, 297 * mm)
-            relatorio = canvas.Canvas(buffer, pagesize=custom_page_size)
-            
-            # Texto principal
-            texto_senha = relatorio.beginText(60, 800)
+        draw.text((20, 430), "             Escaneie o QR Code", fill="black", font=fonte_texto)
+        draw.text((20, 465), "            para ver sua posição.", fill="black", font=fonte_texto)
 
-            texto_senha.setFont("Helvetica", 10)
-            texto_senha.textLine("Fila:" + nome_fila)
-            texto_senha.textOut("Sua senha é ")
-            texto_senha.setFont("Helvetica-Bold", 12)
-            texto_senha.textOut(senha)
-            texto_senha.setFont("Helvetica", 10)
-            texto_senha.textLine(".")
-            relatorio.drawText(texto_senha)
+        # === CONVERTER PARA 1-BIT (ESSENCIAL PARA IMPRESSORAS USB TERMO) ===
+        imagem = imagem.convert("1")  # preto e branco puro!
 
-            # QR Code
-            relatorio.drawImage(self.qr_path, 65, 670, width=100, height=100)
-            
-            # Texto abaixo do QR Code
-            texto_abaixo_qr = ["Escaneie o QR Code para acessar",
-            "sua posição na fila."]
-            
-            text_y = 670 - 20  # margem inferior
-            texto_abaixo_qrcode = relatorio.beginText(25, text_y)
-            texto_abaixo_qrcode.setFont("Helvetica", 10)
-            texto_abaixo_qrcode.textLines(texto_abaixo_qr)
-            relatorio.drawText(texto_abaixo_qrcode)
+        # === SALVAR TEMP ===
+        temp_path = os.path.join(tempfile.gettempdir(), "ticket_print.bmp")
+        imagem.save(temp_path, "BMP")
 
-            relatorio.save()
-            pdf_bytes = buffer.getvalue()
-            if not pdf_bytes:
-                messagebox.showerror("Erro", "Falha ao gerar conteúdo do PDF.")
-                return
+        # === IMPRIMIR ===
+        self.imprimir_imagem_direto(temp_path, impressora)
 
+        # remover arquivo depois
+        try:
+            os.remove(temp_path)
+        except:
+            pass
+  
+    def imprimir_imagem_direto(self, caminho_imagem, impressora=None):
+        # Seleciona impressora padrão se não fornecida
+        if not impressora:
+            impressora = win32print.GetDefaultPrinter()
 
+        # Abre a imagem
+        imagem = Image.open(caminho_imagem)
 
-            self.visualizar_pdf(pdf_bytes)
+        # Cria DC da impressora
+        hPrinter = win32print.OpenPrinter(impressora)
+        try:
+            hDC = win32ui.CreateDC()
+            hDC.CreatePrinterDC(impressora)
 
-        except Exception as e:
-            messagebox.showerror("Erro ao gerar relatório", str(e))
+            # Inicia impressão
+            hDC.StartDoc("Ticket")
+            hDC.StartPage()
+
+            # Cria objeto ImageWin compatível
+            dib = ImageWin.Dib(imagem)
+
+            # Determina área de impressão (em pixels)
+            largura, altura = imagem.size
+            # Define a posição de impressão sem esticar (0,0 até largura/altura originais)
+            dib.draw(hDC.GetHandleOutput(), (0, 0, largura, altura))
+
+            hDC.EndPage()
+            hDC.EndDoc()
+            hDC.DeleteDC()
+        finally:
+            win32print.ClosePrinter(hPrinter)
+
 

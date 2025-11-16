@@ -1,0 +1,12 @@
+
+pyinstaller --name "app_chamada" --onefile --noconsole --icon="fusion.ico"   start_app_chamada.py
+
+
+pyinstaller --name "app_impressao_senha" --onefile --noconsole --icon="fusion.ico"  start_app_impressao_senha.py
+
+
+pyinstaller --name "app_chamada" --onefile  --noconsole --icon="fusion.ico"  start_app_chamada.py
+
+-- apenas gera o executavel sem alterar as configurações do .spec 
+--  o clean apaga o arquivo anterior
+pyinstaller app_chamada.spec
