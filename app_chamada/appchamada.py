@@ -1,7 +1,7 @@
 # ==== CONFIGURAÇÃO FIXA DO COMTYPES/PYTTSX3 (ETAPAS 3 E 4) ====
 import os
-os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "threads;1"
-os.environ["FFMPEG_THREADS"] = "1"
+#os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "threads;1"
+#os.environ["FFMPEG_THREADS"] = "1"
 
 import win32com.client  # ✅ usamos diretamente a API de fala do Windows
 
@@ -148,6 +148,26 @@ class TelaChamada(tk.Toplevel):
     # -------------------------
     # CONTROLE DE VÍDEO (usando VLC)
         # -------------------------
+
+    def check_video_end(self):
+        """Verifica se o vídeo terminou usando posição relativa e reinicia."""
+        if not hasattr(self, "vlc_player") or self.vlc_player is None:
+            return
+
+        pos = self.vlc_player.get_position()  # 0.0 a 1.0
+        
+        if pos >= 0.99:  # vídeo praticamente no fim
+            self.vlc_player.set_position(0.0)  # volta ao início
+            self.vlc_player.stop()
+            self.vlc_player.play()
+            self.vlc_player.set_fullscreen(True)
+
+        # Checa novamente em 100ms
+
+
+        self.after(30000, self.check_video_end)
+
+    
     def play_video(self):
         """Inicia a reprodução do vídeo via VLC embutido no Tkinter."""
         if self.video_running:
@@ -163,7 +183,8 @@ class TelaChamada(tk.Toplevel):
         video_path = os.path.join(app_dir, "video.mp4")
 
         if not os.path.exists(video_path):
-            messagebox.showerror("Erro", f"Vídeo não encontrado: {video_path}")
+            #messagebox.showerror("Erro", f"Vídeo não encontrado: {video_path}")
+            self._atualizar_status(f"ERRO: Vídeo não encontrado: {video_path}")
             return
         
         # Inicializa VLC apenas uma vez
@@ -175,7 +196,7 @@ class TelaChamada(tk.Toplevel):
         media = self.vlc_instance.media_new(video_path)
         self.vlc_player.set_media(media)
         self.vlc_player.video_set_scale(0)  # ajusta automaticamente
-
+        
 
         # Associa o player à janela Tkinter (usa o handle do widget)
         self.update_idletasks()
@@ -193,7 +214,8 @@ class TelaChamada(tk.Toplevel):
         self.vlc_player.play()
         self.vlc_player.set_fullscreen(True)   # 🔥 fullscreen
         self.video_running = True
-
+        # Inicia checagem de fim de vídeo
+        self.check_video_end()
 
     def stop_video(self):
         """Para o vídeo e limpa a tela."""
@@ -268,51 +290,43 @@ class TelaChamada(tk.Toplevel):
         def tarefa():
             try:
                 self._atualizar_status("Atualizando chamadas...")
-
+                erro_msg = '' 
                 dados = []
                 if self.api_client:
                     dados = self.api_client.buscar_chamadas()
-
-                '''if not dados:
-                    self._atualizar_status("Nenhum dado retornado da API.")
-                    return
-
-                textos = [item.get("texto", "") for item in dados if item.get("texto")]
-                if not textos:
-                    self._atualizar_status("Nenhum texto válido recebido.")
-                    return '''
-                
-                if not dados:
-                    self._atualizar_status("Nenhum dado retornado da API.")
-                    # Agenda vídeo automático em 20 segundos
-                    self.after(0, self.agendar_video_automatico)
-                    return
-
-                textos = [item.get("texto", "") for item in dados if item.get("texto")]
-                if not textos:
-                    self._atualizar_status("Nenhum texto válido recebido.")
-                    self.after(0, self.agendar_video_automatico)
-                    return
-
-                # Se chegou aqui, há dados — cancela vídeo e volta para aba chamada
-                self.after(0, self.voltar_para_chamada)
-
-
-                # Atualiza GUI no thread principal
-
-                self.after(0, lambda: self._atualizar_widgets_chamada(dados))
-
-                self._atualizar_status(f"Última atualização: {datetime.now().strftime('%H:%M:%S')}")
-
+             
             except Exception as e:
                 erro_msg = str(e)
+                dados = []
+                # self.after(0, lambda e=e: messagebox.showerror("Erro", f"Falha ao atualizar chamadas:\n{e}"))
+                self._atualizar_status(f"Erro ao Buscar chamadas.: {erro_msg}")
 
-                self.after(0, lambda e=e: messagebox.showerror("Erro", f"Falha ao atualizar chamadas:\n{e}"))
-                
-                self._atualizar_status("Erro ao atualizar chamadas.")
+            if not dados:
+                self._atualizar_status("Nenhum dado retornado da API. "+erro_msg)
+                # Agenda vídeo automático em 20 segundos
+                self.after(0, self.agendar_video_automatico)
+                return
+
+            textos = [item.get("texto", "") for item in dados if item.get("texto")]
+            if not textos:
+                self._atualizar_status("Nenhum texto válido recebido.")
+                self.after(0, self.agendar_video_automatico)
+                return
+
+            # Se chegou aqui, há dados — cancela vídeo e volta para aba chamada
+            self.after(0, self.voltar_para_chamada)
+
+
+            # Atualiza GUI no thread principal
+
+            self.after(0, lambda: self._atualizar_widgets_chamada(dados))
+
+            self._atualizar_status(f"Última atualização: {datetime.now().strftime('%H:%M:%S')}")
+
 
         # Executa em thread separada
         threading.Thread(target=tarefa, daemon=True).start()
+        #tarefa()  
 
     def _atualizar_widgets_chamada(self, dados):
         """Atualiza label_chamando e adiciona chamadas ao histórico rapidamente, sem after."""
@@ -337,9 +351,12 @@ class TelaChamada(tk.Toplevel):
             
 
 
-           
-            # Executa atualizar_realizado
-            self.executar_atualizar_realizado(chamada_id, origem)
+            try: 
+                # Executa atualizar_realizado
+                self.executar_atualizar_realizado(chamada_id, origem)
+            except Exception as e:
+                erro_msg = str(e)
+                self._atualizar_status(f"Erro ao atualizar status chamada no servidor.: {erro_msg}")
 
             # Atualiza histórico no Text (mais recentes no topo)
             self.text_ultimas.config(state="normal")
